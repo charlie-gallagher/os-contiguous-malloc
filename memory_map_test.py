@@ -141,7 +141,7 @@ class MemoryMapTestCase(unittest.TestCase):
             expected_regions
         )
 
-    def test_free_memory_calculatin(self):
+    def test_free_memory_calculation(self):
         memory = mem.Memory()
         memory.memory_map = [True]*100
         memory.free((0, 9))
@@ -149,7 +149,7 @@ class MemoryMapTestCase(unittest.TestCase):
         expected_free_memory = 10
         self.assertEqual(free_memory, expected_free_memory)
     
-    def test_free_memory_calculatin(self):
+    def test_free_memory_percent_calculation(self):
         memory = mem.Memory()
         memory.memory_map = [True]*100
         memory.free((0, 9))
