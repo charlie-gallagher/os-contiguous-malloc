@@ -154,7 +154,8 @@ def main(
         include_process_bounds,
         process_time_bounds,
         process_memory_bounds,
-        sleep_rate
+        sleep_rate,
+        stop_making_processes_tick
 ):
     memory = Memory()
     os = OperatingSystem()
@@ -167,10 +168,11 @@ def main(
     
     i = 1
     while i < ticks:
-        potential_process = get_random_process(process_time_bounds=process_time_bounds, process_memory_bounds=process_memory_bounds)
         new_processes = []
-        if random.randint(include_process_bounds[0], include_process_bounds[1]) == 1:
-            new_processes.append(potential_process)
+        if i < stop_making_processes_tick:
+            potential_process = get_random_process(process_time_bounds=process_time_bounds, process_memory_bounds=process_memory_bounds)
+            if random.randint(include_process_bounds[0], include_process_bounds[1]) == 1:
+                new_processes.append(potential_process)
         tick_environment(memory, os, new_processes, metric_store=metric_store, sleep_rate=sleep_rate)
         i += 1
     print("") # Clear remaining text
@@ -232,6 +234,7 @@ def store_metrics(memory, os, metric_store) -> None:
 
 if __name__ == "__main__":
     ticks = 500
+    stop_making_processes_tick = 500
     include_process_bounds = (1, 2)
     process_time_bounds = (1, 5)
     process_memory_bounds = (10, 50)
@@ -241,5 +244,6 @@ if __name__ == "__main__":
         include_process_bounds=include_process_bounds,
         process_time_bounds=process_time_bounds,
         process_memory_bounds=process_memory_bounds,
-        sleep_rate=sleep_rate
+        sleep_rate=sleep_rate,
+        stop_making_processes_tick=stop_making_processes_tick
     )
