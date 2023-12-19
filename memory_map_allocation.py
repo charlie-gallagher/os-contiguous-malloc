@@ -351,7 +351,7 @@ if __name__ == "__main__":
     process_memory_bounds = (10, 25)
     sleep_rate = 0
     strategy = "best"
-    memory_size = 200
+    memory_size = 100
     main(
         ticks=ticks,
         include_process_bounds=include_process_bounds,

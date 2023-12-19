@@ -23,6 +23,7 @@ Simply run `memory_map_allocation.py`, and you should get a finite program. The 
 - **process_memory_bounds** Each process requests a strict memory requirement. This parameter tweaks the bounds within which a process will be assigned a memory requirement. Measured in 10K blocks.
 - **sleep_rate** The number of seconds to sleep between ticks.
 - **strategy** The memory allocation strategy to use. See section on strategies.
+- **memory_size** The number of memory units available
 
 Some defaults are:
 
@@ -34,6 +35,7 @@ process_time_bounds = (10, 30)
 process_memory_bounds = (10, 50)
 sleep_rate = 0.05
 strategy = "first"
+memory_size = 100
 ```
 
 
