@@ -149,7 +149,13 @@ class OperatingSystem:
 # Main ------------------------------------------------------------------
 
 
-def main():
+def main(
+        ticks,
+        include_process_bounds,
+        process_time_bounds,
+        process_memory_bounds,
+        sleep_rate
+):
     memory = Memory()
     os = OperatingSystem()
     metric_store = {
@@ -160,25 +166,28 @@ def main():
     }
     
     i = 1
-    while i < 500:
-        potential_process = get_random_process()
+    while i < ticks:
+        potential_process = get_random_process(process_time_bounds=process_time_bounds, process_memory_bounds=process_memory_bounds)
         new_processes = []
-        if random.randint(1, 2) == 1:
+        if random.randint(include_process_bounds[0], include_process_bounds[1]) == 1:
             new_processes.append(potential_process)
-        tick_environment(memory, os, new_processes, metric_store=metric_store)
+        tick_environment(memory, os, new_processes, metric_store=metric_store, sleep_rate=sleep_rate)
         i += 1
     print("") # Clear remaining text
     print_summary(metric_store)
     return metric_store
 
 
-def get_random_process():
-    time_remaining = random.randint(10, 100)
-    memory_required = random.randint(1, 5)
+def get_random_process(
+        process_time_bounds,
+        process_memory_bounds,
+):
+    time_remaining = random.randint(process_time_bounds[0], process_time_bounds[1])
+    memory_required = random.randint(process_memory_bounds[0], process_memory_bounds[1])
     return Process(time_remaining=time_remaining, memory_required=memory_required)
 
 
-def tick_environment(memory: Memory, os: OperatingSystem, new_processes: List[Process], metric_store: dict):
+def tick_environment(memory: Memory, os: OperatingSystem, new_processes: List[Process], metric_store: dict, sleep_rate):
     print_metrics(os=os, memory=memory)
     store_metrics(os=os, memory=memory, metric_store=metric_store)
     os.prune_process_map(memory=memory)
@@ -222,4 +231,15 @@ def store_metrics(memory, os, metric_store) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    ticks = 500
+    include_process_bounds = (1, 2)
+    process_time_bounds = (1, 5)
+    process_memory_bounds = (10, 50)
+    sleep_rate = 0.01
+    main(
+        ticks=ticks,
+        include_process_bounds=include_process_bounds,
+        process_time_bounds=process_time_bounds,
+        process_memory_bounds=process_memory_bounds,
+        sleep_rate=sleep_rate
+    )
