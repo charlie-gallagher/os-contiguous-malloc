@@ -121,7 +121,6 @@ class OperatingSystem:
     
     def _flush_queue_first(self, memory: Memory):
         local_queue = self.process_queue.copy()
-        # Loop over processes
         for process in local_queue:
             available_slots = self._get_all_potential_slots(memory=memory, process=process)
             if len(available_slots) > 0:
@@ -261,7 +260,7 @@ def main(
             strategy=strategy,
         )
         i += 1
-    print("")  # Clear remaining text
+    print("")  # Move to next line
     print_summary(metric_store)
     return metric_store
 
@@ -329,13 +328,13 @@ def store_metrics(memory, os, metric_store) -> None:
 
 
 if __name__ == "__main__":
-    ticks = 500
-    stop_making_processes_tick = 500
-    include_process_bounds = (1, 10)
-    process_time_bounds = (5, 60)
-    process_memory_bounds = (5, 30)
-    sleep_rate = 0.01
-    strategy = "first"
+    ticks = 10000
+    stop_making_processes_tick = 10000
+    include_process_bounds = (1, 4)
+    process_time_bounds = (5, 30)
+    process_memory_bounds = (10, 25)
+    sleep_rate = 0
+    strategy = "best"
     main(
         ticks=ticks,
         include_process_bounds=include_process_bounds,

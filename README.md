@@ -45,6 +45,9 @@ strategy = "first"
 - **next** Same as first, but search begins at the point when the most recent process was inserted.
 
 
+# Results
+I was not able to produce meaningfully different results for any strategy. This makes me wonder if I implemented things correctly. I will review and try again.
+
 
 ---
 
