@@ -50,6 +50,45 @@ memory_size = 100
 # Results
 I was not able to produce meaningfully different results for any strategy. This makes me wonder if I implemented things correctly. I will review and try again.
 
+# API
+You can run a parameterized trial with `memory_map_allocation.main()`. It returns a dictionary of lists containing the data for the trial. While the trial is running it updates with the current state, and it prints a summary at the end.
+
+```py
+from memory_map_allocation import main as run_trial
+results = run_trial(
+    ticks=1000,
+    stop_making_processes_tick=1000,
+    include_process_bounds=(1, 4),
+    process_time_bounds=(5, 30),
+    process_memory_bounds=(10, 25),
+    sleep_rate=0,
+    strategy="best",
+    memory_size=100
+)
+
+# Processes: 5    Queued processes: 11    Free blocks: 2  Percent occupied: 96.0%                                    
+# AVERAGES
+# --------
+# Processes: 4.56
+# Queued processes: 3.69
+# Free blocks: 2.35
+# Percent occupied: 79.7%
+```
+
+
+## Implementation
+Under the hood there are a few key classes.
+
+`Memory` is a memory block, which is a list of boolean values. If a member is true, that part of memory is occupied. This memory block object has no concept of processes, which processes are where, or whether a contiguously occupied region belongs to one large process or many small processes. It is only a simple memory map.
+
+It has methods for reserving and freeing regions of memory, and a generator method for looping over contiguous free regions.
+
+`Process` it is a basic storage container for information about a process. Each process is given a size requirement and a number of time intervals ("ticks") that it will take to complete. They are identified by their `id`, which is given when the process becomes known to the operating system.
+
+`OperatingSystem` is responsible for placing processes in memory and removing processes when they are finished. It is composed of a queue of processes that are waiting to start and a list of running processes. It has various other responsibilities, like decrementing the timers on each active process, giving each queued process an id, and updating the status field of the processes as they move from queue to active to dead.
+
+
+
 
 ---
 
