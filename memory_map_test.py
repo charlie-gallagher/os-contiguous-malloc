@@ -62,7 +62,7 @@ class MemoryMapTestCase(unittest.TestCase):
 
         # Start them all
         my_os = mem.OperatingSystem()
-        self.memory.reserve((0, 7))
+        self.memory.reserve(mem.MemorySlice((0, 7)))
         for process in overflowing_process_list:
             process.start(my_os)
 
@@ -84,7 +84,7 @@ class MemoryMapTestCase(unittest.TestCase):
 
     def test_memory_reservation_works_as_expected(self):
         memory = mem.Memory()
-        memory.reserve((0, 9))
+        memory.reserve(mem.MemorySlice((0, 9)))
         expected_output = [True]*10
         expected_output.extend([False]*90)
         self.assertEqual(
@@ -95,7 +95,7 @@ class MemoryMapTestCase(unittest.TestCase):
     def test_memory_free_works_as_expected(self):
         memory = mem.Memory()
         memory.memory_map = [True]*100
-        memory.free((0, 9))
+        memory.free(mem.MemorySlice((0, 9)))
         expected_output = [False]*10
         expected_output.extend([True]*90)
         self.assertEqual(
@@ -106,14 +106,14 @@ class MemoryMapTestCase(unittest.TestCase):
     def test_memory_available_slots_works(self):
         memory = mem.Memory()
         memory.memory_map = [True]*100
-        memory.free((0, 9))
-        memory.free((50, 55))
+        memory.free(mem.MemorySlice((0, 9)))
+        memory.free(mem.MemorySlice((50, 55)))
         avail_regions = []
         for region in memory.available_slots():
             avail_regions.append(region)
         expected_regions = [(0, 9), (50, 55)]
         self.assertEqual(
-            avail_regions,
+            [x._memory_slice for x in avail_regions],
             expected_regions
         )
     
@@ -125,7 +125,7 @@ class MemoryMapTestCase(unittest.TestCase):
             avail_regions.append(region)
         expected_regions = []
         self.assertEqual(
-            avail_regions,
+            [x._memory_slice for x in avail_regions],
             expected_regions
         )
     
@@ -137,14 +137,14 @@ class MemoryMapTestCase(unittest.TestCase):
             avail_regions.append(region)
         expected_regions = [(0, 99)]
         self.assertEqual(
-            avail_regions,
+            [x._memory_slice for x in avail_regions],
             expected_regions
         )
 
     def test_free_memory_calculation(self):
         memory = mem.Memory()
         memory.memory_map = [True]*100
-        memory.free((0, 9))
+        memory.free(mem.MemorySlice((0, 9)))
         free_memory = memory.calculate_free_bytes()
         expected_free_memory = 10
         self.assertEqual(free_memory, expected_free_memory)
@@ -152,8 +152,24 @@ class MemoryMapTestCase(unittest.TestCase):
     def test_free_memory_percent_calculation(self):
         memory = mem.Memory()
         memory.memory_map = [True]*100
-        memory.free((0, 9))
+        memory.free(mem.MemorySlice((0, 9)))
         free_memory = memory.calculate_percent_free_bytes()
         expected_free_memory = 0.1
         self.assertEqual(free_memory, expected_free_memory)
 
+
+class MemorySliceTestCase(unittest.TestCase):
+    def test_memory_slice_initialization(self):
+        s = mem.MemorySlice(memory_slice=(0, 3))
+
+        self.assertEqual(s.start, 0)
+        self.assertEqual(s.end, 3)
+        self.assertEqual(s.length, 4)
+    
+    def test_memory_slice_sub_slice(self):
+        s = mem.MemorySlice(memory_slice=(98, 105))
+
+        self.assertEqual(s.length, 8)
+        s2 = s.sub_slice(length=4)
+        self.assertEqual(s2.length, 4)
+        self.assertEqual(s2.start, 98)

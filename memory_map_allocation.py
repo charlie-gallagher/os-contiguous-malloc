@@ -2,24 +2,50 @@ import time
 import random
 from statistics import mean, median, quantiles
 from typing import List, Optional, Tuple, Union, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
+
+
+@dataclass(slots=True)
+class MemorySlice:
+    memory_slice: InitVar[Tuple[int, int]]
+    _memory_slice: Tuple[int, int] = field(init = False)
+
+    def __post_init__(self, memory_slice):
+        self._memory_slice = memory_slice
+
+    @property
+    def start(self):
+        return self._memory_slice[0]
+
+    @property
+    def end(self):
+        return self._memory_slice[1]
+
+    @property
+    def length(self):
+        return self.end - self.start + 1
+
+    def sub_slice(self, length):
+        assert length <= self.length
+        return MemorySlice((self.start, self.start + length - 1))
 
 
 class Memory:
     def __init__(self) -> None:
         self.memory_map = [False] * 100
-
-    def reserve(self, memory_slice: Tuple[int, int]):
-        self.memory_map[memory_slice[0] : memory_slice[1] + 1] = [True] * (
-            memory_slice[1] - memory_slice[0] + 1
+    
+    def _update_slice_with(self, memory_slice, value) -> None:
+        self.memory_map[memory_slice.start : memory_slice.end + 1] = [value] * (
+            memory_slice.length
         )
 
-    def free(self, memory_slice: Tuple[int, int]):
-        self.memory_map[memory_slice[0] : memory_slice[1] + 1] = [False] * (
-            memory_slice[1] - memory_slice[0] + 1
-        )
+    def reserve(self, memory_slice: MemorySlice) -> None:
+        self._update_slice_with(memory_slice=memory_slice, value=True)
 
-    def available_slots(self) -> Union[Tuple[int, int], None]:
+    def free(self, memory_slice: MemorySlice) -> None:
+        self._update_slice_with(memory_slice=memory_slice, value=False)
+
+    def available_slots(self) -> Union[MemorySlice, None]:
         """
         Get next available slice and its size
 
@@ -48,21 +74,21 @@ class Memory:
 
             end = i - 1
             i += 1
-            yield (start, end)
+            yield MemorySlice(memory_slice=(start, end))
 
-    def calculate_free_bytes(self, as_bytes=False):
+    def calculate_free_bytes(self, as_bytes: bool=False) -> int:
         if as_bytes == True:
             ten_k = 10000
         else:
             ten_k = 1
         return sum([int(not x) for x in self.memory_map if x == False]) * ten_k
 
-    def calculate_percent_free_bytes(self):
+    def calculate_percent_free_bytes(self) -> float:
         free_bytes = self.calculate_free_bytes()
         total_bytes = len(self.memory_map)
         return float(free_bytes) / float(total_bytes)
 
-    def calculate_n_blocks(self):
+    def calculate_n_blocks(self) -> int:
         i = 0
         for x in self.available_slots():
             i += 1
@@ -73,7 +99,7 @@ class Memory:
 class Process:
     time_remaining: int
     memory_required: int
-    memory_slice: Tuple[int, int] = None
+    memory_slice: Optional[MemorySlice] = None
     id: int = -1
     status: str = "INACTIVE"
 
@@ -109,7 +135,7 @@ class OperatingSystem:
         self.id_counter += 1
         return out
 
-    def flush_queue(self, memory: Memory, strategy: str = "first"):
+    def flush_queue(self, memory: Memory, strategy: str = "first") -> None:
         if strategy == "first":
             self._flush_queue_first(memory=memory)
         elif strategy == "best":
@@ -118,26 +144,28 @@ class OperatingSystem:
             self._flush_queue_worst(memory=memory)
         elif strategy == "next":
             raise NotImplementedError()
-    
-    def _flush_queue_first(self, memory: Memory):
+
+    def _flush_queue_first(self, memory: Memory) -> None:
         local_queue = self.process_queue.copy()
         for process in local_queue:
-            available_slots = self._get_all_potential_slots(memory=memory, process=process)
+            available_slots = self._get_all_potential_slots(
+                memory=memory, memory_required=process.memory_required
+            )
             if len(available_slots) > 0:
                 first_available = available_slots[0]
                 self._reserve_slot(memory=memory, slot=first_available, process=process)
 
-    def _flush_queue_best(self, memory: Memory):
+    def _flush_queue_best(self, memory: Memory) -> None:
         local_queue = self.process_queue.copy()
         for process in local_queue:
             available_slots = self._get_all_potential_slots(
-                memory=memory, process=process
+                memory=memory, memory_required=process.memory_required
             )
             best_slot = self._get_best_slot(available_slots=available_slots)
             if best_slot is not None:
                 self._reserve_slot(memory=memory, slot=best_slot, process=process)
 
-    def _get_best_slot(self, available_slots):
+    def _get_best_slot(self, available_slots: List[MemorySlice]) -> MemorySlice:
         """
         Get best fit slot
 
@@ -146,67 +174,54 @@ class OperatingSystem:
         if len(available_slots) < 1:
             return None
 
-        slot_sizes = list(set([x["slot_size"] for x in available_slots]))
+        slot_sizes = list(set([x.length for x in available_slots]))
         best_slot_size = min(slot_sizes)
         best_fit_slots = [
-            x for x in available_slots if x["slot_size"] == best_slot_size
+            x for x in available_slots if x.length == best_slot_size
         ]
         best_slot = best_fit_slots[0]
         return best_slot
 
-    def _flush_queue_worst(self, memory: Memory):
+    def _flush_queue_worst(self, memory: Memory) -> None:
         local_queue = self.process_queue.copy()
         for process in local_queue:
             available_slots = self._get_all_potential_slots(
-                memory=memory, process=process
+                memory=memory, memory_required=process.memory_required
             )
             worst_slot = self._get_worst_slot(available_slots=available_slots)
             if worst_slot is not None:
                 self._reserve_slot(memory=memory, slot=worst_slot, process=process)
 
-    def _get_worst_slot(self, available_slots: List[dict[str, Any]]):
+    def _get_worst_slot(self, available_slots: List[dict[str, Any]]) -> MemorySlice:
         if len(available_slots) < 1:
             return None
 
-        slot_sizes = list(set([x["slot_size"] for x in available_slots]))
+        slot_sizes = list(set([x.length for x in available_slots]))
         worst_slot_size = max(slot_sizes)
         worst_fit_slots = [
-            x for x in available_slots if x["slot_size"] == worst_slot_size
+            x for x in available_slots if x.length == worst_slot_size
         ]
         worst_slot = worst_fit_slots[0]
         return worst_slot
 
-    def _get_all_potential_slots(self, memory, process):
-        memory_required = process.memory_required
-        available_slots = []  # type: List[dict[str, Any]]
-        # Find an available slot
+    def _get_all_potential_slots(self, memory: Memory, memory_required: int) -> List[MemorySlice]:
+        available_slots = []  # type: List[MemorySlice]
         for open_slot in memory.available_slots():
-            slot_size = open_slot[1] - open_slot[0] + 1
-            if memory_required <= slot_size:
-                # TODO: this should probably be an object
-                slot_info = {
-                    "memory_slice": open_slot,
-                    "slot_size": slot_size,
-                    "difference": slot_size - memory_required,
-                }
-                available_slots.append(slot_info)
+            if memory_required <= open_slot.length:
+                available_slots.append(open_slot)
             else:
                 pass
         return available_slots
 
-    def _reserve_slot(self, memory, slot, process):
-        memory_slice = (
-            slot["memory_slice"][0],
-            slot["memory_slice"][0] + process.memory_required - 1,
-        )
+    def _reserve_slot(self, memory: Memory, slot: MemorySlice, process: Process) -> None:
+        memory_slice = slot.sub_slice(length=process.memory_required)
         memory.reserve(memory_slice)
         process.status = "ACTIVE"
         process.memory_slice = memory_slice
         self.process_map.append(process)
         self.process_queue.remove(process)
 
-
-    def prune_process_map(self, memory: Memory):
+    def prune_process_map(self, memory: Memory) -> None:
         """
         Prune the process map to get rid of jobs that have finished
         """
