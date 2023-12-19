@@ -22,6 +22,7 @@ Simply run `memory_map_allocation.py`, and you should get a finite program. The 
 - **process_time_bounds** The amount of time a process will take is decided in advance. This parameter tweaks the bounds within which a process will be assigned a time. Measured in ticks.
 - **process_memory_bounds** Each process requests a strict memory requirement. This parameter tweaks the bounds within which a process will be assigned a memory requirement. Measured in 10K blocks.
 - **sleep_rate** The number of seconds to sleep between ticks.
+- **strategy** The memory allocation strategy to use. See section on strategies.
 
 Some defaults are:
 
@@ -32,7 +33,17 @@ include_process_bounds = (1, 2)
 process_time_bounds = (10, 30)
 process_memory_bounds = (10, 50)
 sleep_rate = 0.05
+strategy = "first"
 ```
+
+
+# Strategies
+
+- **first** Search memory beginning at the start until a memory spot is available that can hold the process.
+- **best** Search memory for the smallest available spot that can still hold the process.
+- **worst** Search memory for the spot that results in the maximum leftover space in the spot.
+- **next** Same as first, but search begins at the point when the most recent process was inserted.
+
 
 
 ---

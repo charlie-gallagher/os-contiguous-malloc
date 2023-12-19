@@ -111,7 +111,17 @@ class OperatingSystem:
         self.id_counter += 1
         return out
 
-    def flush_queue(self, memory: Memory):
+    def flush_queue(self, memory: Memory, strategy: str="first"):
+        if strategy == "first":
+            self._flush_queue_first(memory=memory)
+        elif strategy == "best":
+            raise NotImplementedError()
+        elif strategy == "worst":
+            raise NotImplementedError()
+        elif strategy == "next":
+            raise NotImplementedError()
+        
+    def _flush_queue_first(self, memory: Memory):
         local_queue = self.process_queue.copy()
         # Loop over processes
         for process in local_queue:
@@ -155,7 +165,8 @@ def main(
         process_time_bounds,
         process_memory_bounds,
         sleep_rate,
-        stop_making_processes_tick
+        stop_making_processes_tick,
+        strategy
 ):
     memory = Memory()
     os = OperatingSystem()
@@ -173,7 +184,7 @@ def main(
             potential_process = get_random_process(process_time_bounds=process_time_bounds, process_memory_bounds=process_memory_bounds)
             if random.randint(include_process_bounds[0], include_process_bounds[1]) == 1:
                 new_processes.append(potential_process)
-        tick_environment(memory, os, new_processes, metric_store=metric_store, sleep_rate=sleep_rate)
+        tick_environment(memory, os, new_processes, metric_store=metric_store, sleep_rate=sleep_rate, strategy=strategy)
         i += 1
     print("") # Clear remaining text
     print_summary(metric_store)
@@ -189,14 +200,14 @@ def get_random_process(
     return Process(time_remaining=time_remaining, memory_required=memory_required)
 
 
-def tick_environment(memory: Memory, os: OperatingSystem, new_processes: List[Process], metric_store: dict, sleep_rate):
+def tick_environment(memory: Memory, os: OperatingSystem, new_processes: List[Process], metric_store: dict, sleep_rate, strategy):
     print_metrics(os=os, memory=memory)
     store_metrics(os=os, memory=memory, metric_store=metric_store)
     os.prune_process_map(memory=memory)
-    os.flush_queue(memory=memory)
+    os.flush_queue(memory=memory, strategy=strategy)
     for process in new_processes:
         process.start(queue=os)
-    time.sleep(0.01)
+    time.sleep(sleep_rate)
     return None
 
 
@@ -235,15 +246,17 @@ def store_metrics(memory, os, metric_store) -> None:
 if __name__ == "__main__":
     ticks = 500
     stop_making_processes_tick = 500
-    include_process_bounds = (1, 2)
-    process_time_bounds = (1, 5)
-    process_memory_bounds = (10, 50)
+    include_process_bounds = (1, 10)
+    process_time_bounds = (5, 60)
+    process_memory_bounds = (5, 30)
     sleep_rate = 0.01
+    strategy = "first"
     main(
         ticks=ticks,
         include_process_bounds=include_process_bounds,
         process_time_bounds=process_time_bounds,
         process_memory_bounds=process_memory_bounds,
         sleep_rate=sleep_rate,
-        stop_making_processes_tick=stop_making_processes_tick
+        stop_making_processes_tick=stop_making_processes_tick,
+        strategy=strategy
     )
