@@ -31,8 +31,8 @@ class MemorySlice:
 
 
 class Memory:
-    def __init__(self) -> None:
-        self.memory_map = [False] * 100
+    def __init__(self, size = 100) -> None:
+        self.memory_map = [False] * size
     
     def _update_slice_with(self, memory_slice, value) -> None:
         self.memory_map[memory_slice.start : memory_slice.end + 1] = [value] * (
@@ -243,8 +243,9 @@ def main(
     sleep_rate,
     stop_making_processes_tick,
     strategy,
+    memory_size=100
 ):
-    memory = Memory()
+    memory = Memory(size=memory_size)
     os = OperatingSystem()
     metric_store = {
         "n_processes": [],
@@ -350,6 +351,7 @@ if __name__ == "__main__":
     process_memory_bounds = (10, 25)
     sleep_rate = 0
     strategy = "best"
+    memory_size = 200
     main(
         ticks=ticks,
         include_process_bounds=include_process_bounds,
@@ -358,4 +360,5 @@ if __name__ == "__main__":
         sleep_rate=sleep_rate,
         stop_making_processes_tick=stop_making_processes_tick,
         strategy=strategy,
+        memory_size=memory_size
     )
