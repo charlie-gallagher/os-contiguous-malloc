@@ -118,10 +118,18 @@ class OperatingSystem:
             self._flush_queue_worst(memory=memory)
         elif strategy == "next":
             raise NotImplementedError()
+    
+    def _flush_queue_first(self, memory: Memory):
+        local_queue = self.process_queue.copy()
+        # Loop over processes
+        for process in local_queue:
+            available_slots = self._get_all_potential_slots(memory=memory, process=process)
+            if len(available_slots) > 0:
+                first_available = available_slots[0]
+                self._reserve_slot(memory=memory, slot=first_available, process=process)
 
     def _flush_queue_best(self, memory: Memory):
         local_queue = self.process_queue.copy()
-        # Loop over processes
         for process in local_queue:
             available_slots = self._get_all_potential_slots(
                 memory=memory, process=process
@@ -198,28 +206,6 @@ class OperatingSystem:
         self.process_map.append(process)
         self.process_queue.remove(process)
 
-    def _flush_queue_first(self, memory: Memory):
-        local_queue = self.process_queue.copy()
-        # Loop over processes
-        for process in local_queue:
-            memory_required = process.memory_required
-            # Find an available slot
-            for open_slot in memory.available_slots():
-                slot_size = open_slot[1] - open_slot[0] + 1
-                if memory_required <= slot_size:
-                    memory_slice = (open_slot[0], open_slot[0] + memory_required - 1)
-                    memory.reserve(memory_slice)
-                    process.status = "ACTIVE"
-                    process.memory_slice = memory_slice
-                    self.process_map.append(process)
-                    self.process_queue.remove(process)
-                    break
-                else:
-                    pass
-            # Check for hangers on
-            if process in self.process_queue:
-                # print("Process not placed")
-                pass
 
     def prune_process_map(self, memory: Memory):
         """
@@ -349,7 +335,7 @@ if __name__ == "__main__":
     process_time_bounds = (5, 60)
     process_memory_bounds = (5, 30)
     sleep_rate = 0.01
-    strategy = "worst"
+    strategy = "first"
     main(
         ticks=ticks,
         include_process_bounds=include_process_bounds,
