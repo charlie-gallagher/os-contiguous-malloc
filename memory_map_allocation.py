@@ -364,7 +364,8 @@ def main(
     sleep_rate,
     stop_making_processes_tick,
     strategy,
-    memory_size=100
+    potential_processes_per_tick,
+    memory_size=100,
 ):
     memory = Memory(size=memory_size)
     os = OperatingSystem()
@@ -377,17 +378,14 @@ def main(
 
     i = 1
     while i < ticks:
-        new_processes = []
-        if i < stop_making_processes_tick:
-            potential_process = get_random_process(
-                process_time_bounds=process_time_bounds,
-                process_memory_bounds=process_memory_bounds,
-            )
-            if (
-                random.randint(include_process_bounds[0], include_process_bounds[1])
-                == 1
-            ):
-                new_processes.append(potential_process)
+        new_processes = get_new_processes(
+            tick=i,
+            process_time_bounds=process_time_bounds,
+            process_memory_bounds=process_memory_bounds,
+            stop_making_processes_tick=stop_making_processes_tick,
+            include_process_bounds=include_process_bounds,
+            potential_processes_per_tick=potential_processes_per_tick
+        )
         tick_environment(
             memory,
             os,
@@ -397,9 +395,28 @@ def main(
             strategy=strategy,
         )
         i += 1
-    print("")  # Move to next line
-    print_summary(metric_store)
+    print_summary(metric_store, n_processes=os.id_counter)
     return metric_store
+
+
+def get_new_processes(
+    tick,
+    process_time_bounds: Tuple[int, int],
+    process_memory_bounds: Tuple[int, int],
+    stop_making_processes_tick: int,
+    include_process_bounds: Tuple[int, int],
+    potential_processes_per_tick: int = 5
+) -> List[Process]:
+    new_processes = []
+    if tick < stop_making_processes_tick:
+        for i in range(potential_processes_per_tick):
+            potential_process = get_random_process(
+                process_time_bounds=process_time_bounds,
+                process_memory_bounds=process_memory_bounds,
+            )
+            if random.randint(include_process_bounds[0], include_process_bounds[1]) == 1:
+                new_processes.append(potential_process)
+    return new_processes
 
 
 def get_random_process(
@@ -440,15 +457,17 @@ def print_metrics(memory, os):
     )
 
 
-def print_summary(metric_store):
+def print_summary(metric_store: dict[str, Any], n_processes: int):
+    print("")  # Move to next line
     avg_processes = mean(metric_store["n_processes"])
     avg_queue = mean(metric_store["n_queue"])
-    avg_occupied = mean(metric_store["pct_occupied"])
     avg_blocks = mean(metric_store["n_blocks"])
+    n_processes = n_processes
+    avg_occupied = mean(metric_store["pct_occupied"])
     print("AVERAGES")
     print("--------")
     print(
-        f"Processes: {avg_processes}\nQueued processes: {avg_queue}\nFree blocks: {avg_blocks}\nPercent occupied: {avg_occupied}%"
+        f"Processes: {avg_processes}\nQueued processes: {avg_queue}\nFree blocks: {avg_blocks}\nNumber of processes created: {n_processes}\nPercent occupied: {avg_occupied}%"
     )
 
 
@@ -469,10 +488,11 @@ if __name__ == "__main__":
     stop_making_processes_tick = 10000
     include_process_bounds = (1, 4)
     process_time_bounds = (5, 30)
-    process_memory_bounds = (10, 25)
+    process_memory_bounds = (1, 35)
     sleep_rate = 0
-    strategy = "best"
+    strategy = "first"
     memory_size = 100
+    potential_processes_per_tick = 2
     main(
         ticks=ticks,
         include_process_bounds=include_process_bounds,
@@ -481,5 +501,6 @@ if __name__ == "__main__":
         sleep_rate=sleep_rate,
         stop_making_processes_tick=stop_making_processes_tick,
         strategy=strategy,
-        memory_size=memory_size
+        memory_size=memory_size,
+        potential_processes_per_tick=potential_processes_per_tick
     )
