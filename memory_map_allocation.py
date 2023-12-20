@@ -7,8 +7,30 @@ from dataclasses import dataclass, field, InitVar
 
 @dataclass(slots=True)
 class MemorySlice:
+    """
+    A contiguous block of memory
+    ============================
+
+    Convenience methods for dealing with slices of memory.
+
+    Members
+    -------
+    ``start``
+        The first index in the slice
+    ``end``
+        The last index in the slice
+    ``length``
+        The number of memory blocks available
+
+    Methods
+    -------
+    ``sub_slice``
+        Returns a new memory slice with a length less than or equal to the
+        original.
+    """
+
     memory_slice: InitVar[Tuple[int, int]]
-    _memory_slice: Tuple[int, int] = field(init = False)
+    _memory_slice: Tuple[int, int] = field(init=False)
 
     def __post_init__(self, memory_slice):
         self._memory_slice = memory_slice
@@ -26,14 +48,48 @@ class MemorySlice:
         return self.end - self.start + 1
 
     def sub_slice(self, length):
+        """
+        Get a sub-slice of the current slice
+
+        Processes only need to reserve those blocks that they need, so this
+        returns a sub slice of a given length from a larger slice.
+        """
         assert length <= self.length
         return MemorySlice((self.start, self.start + length - 1))
 
 
 class Memory:
-    def __init__(self, size = 100) -> None:
+    """
+    A simple memory map
+    ===================
+
+    Contains a memory map that tells which blocks of memory are available and
+    occupied.
+
+    Members
+    -------
+    ``memory_map``
+        A boolean array.
+
+    Methods
+    -------
+    ``reserve``
+        Reserve a block of memory
+    ``free``
+        Free a block of memory
+    ``available_slots``
+        A generator that returns contiguous slices of free memory
+    ``calculate_free_bytes``
+        Returns the number of free blocks of memory
+    ``calculate_percent_free_bytes``
+        Returns the percentage of memory that is free as a float between 0 and 1
+    ``calculate_n_blocks``
+        Returns the number of contiguous free blocks (not memory units)
+    """
+
+    def __init__(self, size=100) -> None:
         self.memory_map = [False] * size
-    
+
     def _update_slice_with(self, memory_slice, value) -> None:
         self.memory_map[memory_slice.start : memory_slice.end + 1] = [value] * (
             memory_slice.length
@@ -51,9 +107,7 @@ class Memory:
 
         A generator.
 
-        Returns the following tuple:
-        ::
-            ``(start, end)``
+        Returns a ``MemorySlice``.
         """
         if len(self.memory_map) == 0:
             return None
@@ -76,7 +130,7 @@ class Memory:
             i += 1
             yield MemorySlice(memory_slice=(start, end))
 
-    def calculate_free_bytes(self, as_bytes: bool=False) -> int:
+    def calculate_free_bytes(self, as_bytes: bool = False) -> int:
         if as_bytes == True:
             ten_k = 10000
         else:
@@ -97,6 +151,36 @@ class Memory:
 
 @dataclass(slots=True)
 class Process:
+    """
+    Process abstraction
+    ===================
+    Stores fundamental and identifying characteristics of a process.
+
+    Members
+    -------
+    ``time_remaining``
+        Initially, the number of ticks the process will take to complete. The
+        operating system decrements this to keep track of which processes are
+        still running and which have finished.
+    ``memory_required``
+        The number of memory units that the process will occupy.
+    ``memory_slice``
+        The memory slice the process occupies once it's placed by the
+        operating system.
+    ``id``
+        A unique identifier assigned by the operating system.
+    ``status``
+        One of "INACTIVE", "QUEUED", or "ACTIVE". Also updated by the operating
+        system.
+
+    Methods
+    -------
+    ``decrement_timer``
+        Used to decrement the timer
+    ``start``
+        Enter the operating systems queue, and receive an ID.
+    """
+
     time_remaining: int
     memory_required: int
     memory_slice: Optional[MemorySlice] = None
@@ -115,12 +199,36 @@ class Process:
     def start(self, queue: "OperatingSystem") -> None:
         self.id = queue.push(self)
 
-    def end(self, queue: "OperatingSystem") -> None:
-        queue.destroy(self)
-
 
 @dataclass(eq=False)
 class OperatingSystem:
+    """
+    Operating system abstraction
+    ----------------------------
+    A process queue and a process map, with methods for allocating processes
+    into memory.
+
+    Members
+    -------
+    ``process_map``
+        The list of active processes
+    ``process_queue``
+        The list of processes that want to begin
+    ``id_counter``
+        Used for generating process ids
+
+    Methods
+    -------
+    ``push``
+        Add a process to the queue
+    ``flush_queue``
+        Attempt to allocate resources for each process and add them to the
+        process map.
+    ``prune_process_map``
+        Remove processes that have finished from the process map and free their
+        resources.
+    """
+
     process_map: List[Process] = field(default_factory=list)
     process_queue: List[Process] = field(default_factory=list)
     id_counter: int = 0
@@ -136,6 +244,17 @@ class OperatingSystem:
         return out
 
     def flush_queue(self, memory: Memory, strategy: str = "first") -> None:
+        """
+        Empty the queue
+        ================================================================
+        Attempt to empty the queue by allocating memory for each process.
+
+        ``memory``
+            A ``Memory`` object to use for allocating processes.
+        ``strategy``
+            Which strategy to use to place processes. One of "first", "best",
+            "worst", or "next".
+        """
         if strategy == "first":
             self._flush_queue_first(memory=memory)
         elif strategy == "best":
@@ -176,9 +295,7 @@ class OperatingSystem:
 
         slot_sizes = list(set([x.length for x in available_slots]))
         best_slot_size = min(slot_sizes)
-        best_fit_slots = [
-            x for x in available_slots if x.length == best_slot_size
-        ]
+        best_fit_slots = [x for x in available_slots if x.length == best_slot_size]
         best_slot = best_fit_slots[0]
         return best_slot
 
@@ -198,13 +315,13 @@ class OperatingSystem:
 
         slot_sizes = list(set([x.length for x in available_slots]))
         worst_slot_size = max(slot_sizes)
-        worst_fit_slots = [
-            x for x in available_slots if x.length == worst_slot_size
-        ]
+        worst_fit_slots = [x for x in available_slots if x.length == worst_slot_size]
         worst_slot = worst_fit_slots[0]
         return worst_slot
 
-    def _get_all_potential_slots(self, memory: Memory, memory_required: int) -> List[MemorySlice]:
+    def _get_all_potential_slots(
+        self, memory: Memory, memory_required: int
+    ) -> List[MemorySlice]:
         available_slots = []  # type: List[MemorySlice]
         for open_slot in memory.available_slots():
             if memory_required <= open_slot.length:
@@ -213,7 +330,9 @@ class OperatingSystem:
                 pass
         return available_slots
 
-    def _reserve_slot(self, memory: Memory, slot: MemorySlice, process: Process) -> None:
+    def _reserve_slot(
+        self, memory: Memory, slot: MemorySlice, process: Process
+    ) -> None:
         memory_slice = slot.sub_slice(length=process.memory_required)
         memory.reserve(memory_slice)
         process.status = "ACTIVE"
@@ -223,7 +342,9 @@ class OperatingSystem:
 
     def prune_process_map(self, memory: Memory) -> None:
         """
-        Prune the process map to get rid of jobs that have finished
+        Prune the process map
+        =================
+        Remove processes that have finished.
         """
         for process in self.process_map:
             process.decrement_timer()
