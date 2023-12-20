@@ -133,10 +133,6 @@ class Memory:
     def print_memory_map(self):
         occupied_char = "█"
         free_char = "░"
-        # occupied_char = '█'
-        # free_char = '▁'
-        # occupied_char = '▮'
-        # free_char = '▯'
         printed_map = [] # type: List[str]
         for x in self.memory_map:
             if x == True:
@@ -453,8 +449,7 @@ def tick_environment(
     sleep_rate,
     strategy,
 ):
-    # print_metrics(os=os, memory=memory)
-    memory.print_memory_map()
+    print_metrics(os=os, memory=memory)
     store_metrics(os=os, memory=memory, metric_store=metric_store)
     os.prune_process_map(memory=memory)
     os.flush_queue(memory=memory, strategy=strategy)
@@ -464,19 +459,25 @@ def tick_environment(
     return None
 
 
-def print_metrics(memory, os):
+def print_metrics(memory: Memory, os: OperatingSystem):
     n_processes = len(os.process_map)
     n_queue = len(os.process_queue)
     pct_occupied = (1 - memory.calculate_percent_free_bytes()) * 100
     n_blocks = memory.calculate_n_blocks()
+
+    memory.print_memory_map()
+    print("")
     print(
         f"Processes: {n_processes}\tQueued processes: {n_queue}\tFree blocks: {n_blocks}\tPercent occupied: {pct_occupied}%                      ",
         end="\r",
     )
+    print("\033[A\033[A")
 
 
 def print_summary(metric_store: dict[str, Any], n_processes: int):
-    print("")  # Move to next line
+    print("")
+    print("")
+    print("")  # Move to next line, don't overwrite anything
     avg_processes = mean(metric_store["n_processes"])
     avg_queue = mean(metric_store["n_queue"])
     avg_blocks = mean(metric_store["n_blocks"])
@@ -502,12 +503,12 @@ def store_metrics(memory, os, metric_store) -> None:
 
 
 if __name__ == "__main__":
-    ticks = 10000
-    stop_making_processes_tick = 10000
+    ticks = 1000
+    stop_making_processes_tick = 1000
     include_process_bounds = (1, 4)
     process_time_bounds = (5, 30)
     process_memory_bounds = (1, 35)
-    sleep_rate = 0
+    sleep_rate = 0.02
     strategy = "first"
     memory_size = 100
     potential_processes_per_tick = 2
