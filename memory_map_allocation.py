@@ -129,6 +129,23 @@ class Memory:
             end = i - 1
             i += 1
             yield MemorySlice(memory_slice=(start, end))
+    
+    def print_memory_map(self):
+        occupied_char = "█"
+        free_char = "░"
+        # occupied_char = '█'
+        # free_char = '▁'
+        # occupied_char = '▮'
+        # free_char = '▯'
+        printed_map = [] # type: List[str]
+        for x in self.memory_map:
+            if x == True:
+                printed_map.append(occupied_char)
+            else:
+                printed_map.append(free_char)
+        print(''.join(printed_map), end = '\r')
+
+
 
     def calculate_free_bytes(self, as_bytes: bool = False) -> int:
         if as_bytes == True:
@@ -436,7 +453,8 @@ def tick_environment(
     sleep_rate,
     strategy,
 ):
-    print_metrics(os=os, memory=memory)
+    # print_metrics(os=os, memory=memory)
+    memory.print_memory_map()
     store_metrics(os=os, memory=memory, metric_store=metric_store)
     os.prune_process_map(memory=memory)
     os.flush_queue(memory=memory, strategy=strategy)
