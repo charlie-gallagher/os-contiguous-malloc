@@ -48,6 +48,22 @@ memory_size = 100
 - **worst** Search memory for the spot that results in the maximum leftover space in the spot.
 - **next** Same as first, but search begins at the point when the most recent process was inserted.
 
+## Visualizations
+The below visualizations were created under the following conditions:
+
+```py
+main(
+    ticks = 250,
+    stop_making_processes_tick = 200,
+    include_process_bounds = (1, 4),
+    process_time_bounds = (5, 25),
+    process_memory_bounds = (1, 4),
+    sleep_rate = 0.02,
+    strategy = "first",
+    memory_size = 125,
+    potential_processes_per_tick = 4
+)
+``````
 
 ### "First" strategy visualization
 
