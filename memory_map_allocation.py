@@ -503,15 +503,15 @@ def store_metrics(memory, os, metric_store) -> None:
 
 
 if __name__ == "__main__":
-    ticks = 1000
-    stop_making_processes_tick = 1000
+    ticks = 250
+    stop_making_processes_tick = 200
     include_process_bounds = (1, 4)
-    process_time_bounds = (5, 30)
-    process_memory_bounds = (1, 35)
+    process_time_bounds = (5, 25)
+    process_memory_bounds = (1, 4)
     sleep_rate = 0.02
     strategy = "first"
-    memory_size = 100
-    potential_processes_per_tick = 2
+    memory_size = 125
+    potential_processes_per_tick = 4
     main(
         ticks=ticks,
         include_process_bounds=include_process_bounds,

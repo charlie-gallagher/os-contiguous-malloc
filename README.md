@@ -49,6 +49,17 @@ memory_size = 100
 - **next** Same as first, but search begins at the point when the most recent process was inserted.
 
 
+### "First" strategy visualization
+
+![First strategy](https://github.com/charlie-gallagher/os-contiguous-malloc/blob/main/first-strategy.gif)
+
+### "Worst" strategy visualization
+
+![Worst strategy](https://github.com/charlie-gallagher/os-contiguous-malloc/blob/main/worst-strategy.gif)
+
+
+
+
 # Results
 I was not able to produce meaningfully different results for any strategy. This makes me wonder if I implemented things correctly. I will review and try again.
 
