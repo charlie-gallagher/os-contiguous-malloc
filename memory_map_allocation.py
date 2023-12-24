@@ -1,6 +1,6 @@
 import time
 import random
-from statistics import mean, median, quantiles
+from statistics import mean
 from typing import List, Optional, Tuple, Union, Any
 from dataclasses import dataclass, field, InitVar
 
@@ -130,7 +130,7 @@ class Memory:
             i += 1
             yield MemorySlice(memory_slice=(start, end))
     
-    def print_memory_map(self):
+    def print_memory_map(self) -> None:
         occupied_char = "█"
         free_char = "░"
         printed_map = [] # type: List[str]
@@ -183,8 +183,12 @@ class Process:
     ``id``
         A unique identifier assigned by the operating system.
     ``status``
-        One of "INACTIVE", "QUEUED", or "ACTIVE". Also updated by the operating
-        system.
+        One of "INACTIVE", "QUEUED", "ACTIVE", or "DEFERRED". Also updated by the
+        operating system.
+    ``priority``
+        A priority level, between 0 and 15. (15 is lowest priority.)
+    ``queue_age``
+        Time spent in the queue.
 
     Methods
     -------
@@ -199,6 +203,8 @@ class Process:
     memory_slice: Optional[MemorySlice] = None
     id: int = -1
     status: str = "INACTIVE"
+    priority: int = 15
+    queue_age: int = 0
 
     def __eq__(self, other: object) -> bool:
         return self.id == other.id
@@ -211,6 +217,10 @@ class Process:
 
     def start(self, queue: "OperatingSystem") -> None:
         self.id = queue.push(self)
+
+    def bump_priority(self) -> int:
+        if self.priority > 0:
+            self.priority -= 1
 
 
 @dataclass(eq=False)
@@ -268,6 +278,19 @@ class OperatingSystem:
             Which strategy to use to place processes. One of "first", "best",
             "worst", or "next".
         """
+        # Bump queue ages
+        for p in self.process_queue:
+            if p.status != "DEFERRED":
+                p.queue_age += 1
+
+        self.process_queue.sort(key=lambda x: x.priority)
+
+        # Give absolute priority to queued processes with priority 0
+        if any([x.priority == 0 for x in self.process_queue]):
+            self._defer_low_priority_processes()
+        else:
+            self._enable_all_priority_processes()
+
         if strategy == "first":
             self._flush_queue_first(memory=memory)
         elif strategy == "best":
@@ -277,9 +300,27 @@ class OperatingSystem:
         elif strategy == "next":
             raise NotImplementedError()
 
+        # Bump priority of any remaining processes
+        for qp in self.process_queue:
+            if qp.status != "DEFERRED":
+                qp.bump_priority()
+
+
+    def _defer_low_priority_processes(self):
+        for qp in self.process_queue:
+            if qp.priority > 0:
+                qp.status = "DEFERRED"
+
+    def _enable_all_priority_processes(self):
+        for qp in self.process_queue:
+            qp.status = "QUEUED"
+
+
     def _flush_queue_first(self, memory: Memory) -> None:
         local_queue = self.process_queue.copy()
         for process in local_queue:
+            if process.status == "DEFERRED":
+                continue
             available_slots = self._get_all_potential_slots(
                 memory=memory, memory_required=process.memory_required
             )
@@ -290,6 +331,8 @@ class OperatingSystem:
     def _flush_queue_best(self, memory: Memory) -> None:
         local_queue = self.process_queue.copy()
         for process in local_queue:
+            if process.status == "DEFERRED":
+                continue
             available_slots = self._get_all_potential_slots(
                 memory=memory, memory_required=process.memory_required
             )
@@ -315,6 +358,8 @@ class OperatingSystem:
     def _flush_queue_worst(self, memory: Memory) -> None:
         local_queue = self.process_queue.copy()
         for process in local_queue:
+            if process.status == "DEFERRED":
+                continue
             available_slots = self._get_all_potential_slots(
                 memory=memory, memory_required=process.memory_required
             )
@@ -378,7 +423,7 @@ def main(
     stop_making_processes_tick,
     strategy,
     potential_processes_per_tick,
-    memory_size=100,
+    memory_size=50,
 ):
     memory = Memory(size=memory_size)
     os = OperatingSystem()
@@ -387,6 +432,7 @@ def main(
         "n_queue": [],
         "pct_occupied": [],
         "n_blocks": [],
+        "max_queue_age": []
     }
 
     i = 1
@@ -464,11 +510,18 @@ def print_metrics(memory: Memory, os: OperatingSystem):
     n_queue = len(os.process_queue)
     pct_occupied = (1 - memory.calculate_percent_free_bytes()) * 100
     n_blocks = memory.calculate_n_blocks()
+    if len(os.process_queue) > 0:
+        avg_priority_in_queue = min([x.priority for x in os.process_queue])
+        max_queue_age = max([x.queue_age for x in os.process_queue])
+    else:
+        avg_priority_in_queue = -1
+        max_queue_age = -1
+
 
     memory.print_memory_map()
     print("")
     print(
-        f"Processes: {n_processes}\tQueued processes: {n_queue}\tFree blocks: {n_blocks}\tPercent occupied: {pct_occupied}%                      ",
+            f"Processes: {n_processes:3d}\tQueued processes: {n_queue:3d}\tFree blocks: {n_blocks:2d}\tMax queue age: {max_queue_age:3d}   ",
         end="\r",
     )
     print("\033[A\033[A")
@@ -483,10 +536,11 @@ def print_summary(metric_store: dict[str, Any], n_processes: int):
     avg_blocks = mean(metric_store["n_blocks"])
     n_processes = n_processes
     avg_occupied = mean(metric_store["pct_occupied"])
+    avg_max_queue_age = mean(metric_store["max_queue_age"])
     print("AVERAGES")
     print("--------")
     print(
-        f"Processes: {avg_processes}\nQueued processes: {avg_queue}\nFree blocks: {avg_blocks}\nNumber of processes created: {n_processes}\nPercent occupied: {avg_occupied}%"
+            f"Processes: {avg_processes}\nQueued processes: {avg_queue}\nFree blocks: {avg_blocks}\nNumber of processes created: {n_processes}\nPercent occupied: {avg_occupied}%\nAvg maximum queue age: {avg_max_queue_age}"
     )
 
 
@@ -495,23 +549,30 @@ def store_metrics(memory, os, metric_store) -> None:
     n_queue = len(os.process_queue)
     pct_occupied = (1 - memory.calculate_percent_free_bytes()) * 100
     n_blocks = memory.calculate_n_blocks()
+    if len(os.process_queue) > 0:
+        avg_priority_in_queue = min([x.priority for x in os.process_queue])
+        max_queue_age = max([x.queue_age for x in os.process_queue])
+    else:
+        avg_priority_in_queue = None
+        max_queue_age = 0
     metric_store["n_processes"].append(n_processes)
     metric_store["n_queue"].append(n_queue)
     metric_store["pct_occupied"].append(pct_occupied)
     metric_store["n_blocks"].append(n_blocks)
+    metric_store["max_queue_age"].append(max_queue_age)
     return None
 
 
 if __name__ == "__main__":
-    ticks = 250
-    stop_making_processes_tick = 200
+    ticks = 10000
+    stop_making_processes_tick = 9000
     include_process_bounds = (1, 4)
     process_time_bounds = (5, 25)
     process_memory_bounds = (1, 4)
-    sleep_rate = 0.02
-    strategy = "first"
-    memory_size = 125
-    potential_processes_per_tick = 4
+    sleep_rate = 0.1
+    strategy = "best"
+    memory_size = 100
+    potential_processes_per_tick = 10
     main(
         ticks=ticks,
         include_process_bounds=include_process_bounds,
