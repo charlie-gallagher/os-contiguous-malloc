@@ -75,10 +75,6 @@ main(
 
 
 
-
-# Results
-I was not able to produce meaningfully different results for any strategy. This makes me wonder if I implemented things correctly. I will review and try again.
-
 # API
 You can run a parameterized trial with `memory_map_allocation.main()`. It returns a dictionary of lists containing the data for the trial. While the trial is running it updates with the current state, and it prints a summary at the end.
 
@@ -118,6 +114,10 @@ It has methods for reserving and freeing regions of memory, and a generator meth
 `OperatingSystem` is responsible for placing processes in memory and removing processes when they are finished. It is composed of a queue of processes that are waiting to start and a list of running processes. It has various other responsibilities, like decrementing the timers on each active process, giving each queued process an id, and updating the status field of the processes as they move from queue to active to dead.
 
 
+### Priority queueing
+I recently implemented basic priority queueing, or something more like deadline queueing. Processes are given priority based on how long they've been in the queue (each tick, a queued processes' priority is bumped). Once a process reaches maximum priority (0), all processes with a lower priority are suspended until the maximum-priority process is placed in memory. This doesn't usually take long, since processes are completing all the time.
+
+While highest-priority processes are being placed, other processes do not age, and their priority levels do not increase. They are, however, still included in the "Max queue age" metric and any other queue metrics.
 
 
 ---
