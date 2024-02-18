@@ -101,7 +101,7 @@ class Memory:
     def free(self, memory_slice: MemorySlice) -> None:
         self._update_slice_with(memory_slice=memory_slice, value=False)
 
-    def available_slots(self) -> Union[MemorySlice, None]:
+    def available_slots(self) -> Any:
         """
         Get next available slice and its size
 
