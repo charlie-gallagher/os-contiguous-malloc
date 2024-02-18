@@ -3,8 +3,13 @@ from dataclasses import dataclass, InitVar, field
 from collections import deque
 
 
+# LIBRARY CODE --------------
 class VirtualMemoryExceededError(Exception):
     pass
+
+
+PAGE_SIZE = 4
+VIRTUAL_MEMORY_PAGES = 256
 
 
 @dataclass(slots=True)
@@ -186,6 +191,12 @@ class VirtualMemory:
         self.free_list = [x.id for x in self.pages]
         self.occupied_list = []
 
+    def reserve_pages(self, n: int) -> List[Page]:
+        # TODO: Only allocate contiguous pages
+        allocated_page_ids = self.free_list[:n]
+        allocated_pages = [x for x in self.pages if x.id in allocated_page_ids]
+        return allocated_pages
+
 
 @dataclass(slots=True)
 class VirtualAddress:
@@ -193,7 +204,7 @@ class VirtualAddress:
     offset: int
 
 
-def get_virtual_address(x, bits=32, page_size=4):
+def to_virtual_address(x: int, bits=32, page_size=4):
     max_address = (2**bits) - 1
     if x > max_address:
         raise VirtualMemoryExceededError(
@@ -206,38 +217,24 @@ def get_virtual_address(x, bits=32, page_size=4):
     va = VirtualAddress(page=(x & page_mask) >> page_shift, offset=x & offset_mask)
     return va
 
+def to_process_address(x: VirtualAddress, page_size=4):
+    page_shift = page_size
+    proc_addr = (x.page << page_shift) + x.offset
+    return proc_addr
+
+
+@dataclass
+class Program:
+    memory_size: int
+    instructions: List[int]
+
 
 @dataclass
 class Process:
     # Should each process translate its address space into pages?
     id: int
     size: int
-
-    def __post_init__(self):
-        self.virtual_addresses = tuple(range(self.size))
-        self.future_accesses = self.init_future_accesses()
-        self.lifetime = len(self.virtual_addresses)
-
-    def init_future_accesses(self):
-        """
-        Pops from the left every tick
-        """
-        # For now, go sequentially
-        address_sequence = deque(self.virtual_addresses)
-        return address_sequence
-
-
-@dataclass
-class OsProcess:
-    process: Process
-    pages: List[int] = field(default_factory=list)
-
-    def __post_init__(self):
-        self.virtual_address_space = MemorySlice()
-
-    def init_virtual_address_space(self, os):
-        self.virtual_address_space = os.reserve_virtual_block(process=self)
-        self.remaining_memory_accesses = deque(range(self.size))
+    instructions: List[int]
 
 
 @dataclass
@@ -245,17 +242,40 @@ class OperatingSystem:
     virtual_memory: VirtualMemory
     physical_memory: Memory
     page_size: int
-    process_table: List[OsProcess]
+    process_table: List[Process] = field(init=False, default_factory=list)
+    page_table: List[Page] = field(init=False, default_factory=list)
+    next_process_id: int = field(init=False, default=0)
 
-    def __post_init__(self):
-        # Maps a page id onto a physical address
-        self.page_table_map = {
-            x.id: None for x in self.virtual_memory.pages
-        }  # type: dict[int, Union[None, MemorySlice]]
+    def _get_new_process_id(self):
+        out = self.next_process_id
+        self.next_process_id += 1
+        return out
 
-    def add_process(self, process: Process):
+    def start_process(self, program: Process):
+        process = self.init_process(program=program)
         self.process_table.append(process)
-        process_pages = self.reserve_process_pages(size=process.size)
+
+    def init_process(self, program: Program):
+        """Map to virtual memory, create Process object"""
+        initial_virtual_address = self.reserve_virtual_memory(size=program.memory_size)
+        process_instructions = [x + initial_virtual_address for x in program.instructions]
+        # TODO: process ids
+        process_id = self._get_new_process_id()
+        process = Process(
+            id=process_id,
+            size=program.memory_size,
+            instructions=process_instructions
+        )
+        return process
+    
+    def reserve_virtual_memory(self, size: int):
+        """Gets a block of virtual memory of size ``size`` and returns starting address"""
+        required_pages = (size // self.page_size) + 1
+        reserved_pages = self.virtual_memory.reserve_pages(n=required_pages)
+        first_page_address = VirtualAddress(page=reserved_pages[0].id, offset=0)
+        starting_address = to_process_address(x=first_page_address, page_size=self.page_size)
+        return starting_address
+
 
     def reserve_process_pages(self, size):
         required_pages = (size // self.page_size) + 1
@@ -268,11 +288,8 @@ class OperatingSystem:
         self.virtual_memory.occupied_list.extend(pages_to_reserve)
         return pages_to_reserve
 
-    def reserve_virtual_block(self, process: Process):
-        required_pages = process.size / self.page_size
-        # Record page associations in process table
 
-
+# RUNTIME FUNCTIONALITY ----------
 def main():
     pass
 
@@ -283,20 +300,9 @@ def _generate_virtual_memory(pages, page_size):
 
 if __name__ == "__main__":
     os = OperatingSystem(
-        virtual_memory=_generate_virtual_memory(pages=10, page_size=5),
+        virtual_memory=_generate_virtual_memory(
+            pages=VIRTUAL_MEMORY_PAGES, page_size=PAGE_SIZE
+        ),
         physical_memory=Memory(size=50),
-        page_size=5,
-        process_table=[],
+        page_size=PAGE_SIZE,
     )
-    # 0001 1011, page = 1, offset = 11
-    addr1 = 0x1B
-    # 1111 0011, page = 15, offset = 3
-    addr2 = 0xF3
-    # Out of bounds
-    addr3 = 2**33
-
-    for addr in (addr1, addr2, addr3):
-        virtual_address = get_virtual_address(x=addr, bits=8, page_size=4)
-        print(
-            f"Address: {addr}, Page: {virtual_address.page}, Offset: {virtual_address.offset}"
-        )

@@ -106,6 +106,28 @@ At each tick, what should happen?
 - Some new processes are generated
 - Once a process executes its last instruction, it is removed and the pages are freed
 
+## Running a process
+When the operating system picks a process off of the runnable queue, it will do something like this:
+
+```python
+new_program = q.pop()
+new_process = Process(
+    virtual_address_range=self.get_virtual_address_range(new_program),
+    id=id,
+    size=new_program.size
+)
+add_new_pages_to_page_table(
+    pid=new_process.id,
+    pages=os.get_pages(new_process) # gets page IDs for each page in address space
+)
+```
+
+Some design notes:
+
+- Process does not know about pages
+- Adding pages to the page table should probably happen when the virtual address range is allocated
+- The virtual address range is a straightforward mapping; the virtual addresses are still sequential
+
 
 
 
