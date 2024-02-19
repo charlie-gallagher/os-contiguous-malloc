@@ -270,6 +270,7 @@ class OperatingSystem:
     def start_process(self, program: Process):
         process = self.init_process(program=program)
         self.process_table.append(process)
+        return process.id
     
     def close_process(self, pid: int):
         process_index = self.process_table.index(pid)

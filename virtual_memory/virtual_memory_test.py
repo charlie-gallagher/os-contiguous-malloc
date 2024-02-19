@@ -99,8 +99,8 @@ class OperatingSystemTestCase(unittest.TestCase):
             memory_size=32,
             instructions=list(range(32))
         )
-        self.os.start_process(program=program)
-        self.os.close_process(pid=0)
+        pid = self.os.start_process(program=program)
+        self.os.close_process(pid=pid)
 
         self.assertEqual(
             len(self.os.process_table),
@@ -114,6 +114,34 @@ class OperatingSystemTestCase(unittest.TestCase):
             self.os.virtual_memory.free_list,
             list(range(8, vm.VIRTUAL_MEMORY_PAGES)) + list(range(0, 8))
         )
+
+    def test_teardown_second_process(self):
+        program1 = vm.Program(
+            memory_size=32,
+            instructions=list(range(32))
+        )
+        program2 = vm.Program(
+            memory_size=32,
+            instructions=list(range(32))
+        )
+        pid1 = self.os.start_process(program=program1)
+        pid2 = self.os.start_process(program=program2)
+        self.os.close_process(pid=pid2)
+
+        self.assertEqual(
+            len(self.os.process_table),
+            1
+        )
+        self.assertEqual(
+            self.os.virtual_memory.occupied_list,
+            list(range(8))
+        )
+        self.assertEqual(
+            self.os.virtual_memory.free_list,
+            list(range(16, vm.VIRTUAL_MEMORY_PAGES)) + list(range(8, 16))
+        )
+
+    
         
         
     
