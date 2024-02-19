@@ -181,6 +181,9 @@ class Page:
     accessed: bool = False
     modified: bool = False
 
+    def __eq__(self, __value: object) -> bool:
+        return self.id == __value.id
+
 
 @dataclass
 class VirtualMemory:
@@ -199,6 +202,11 @@ class VirtualMemory:
         self.occupied_list.extend(allocated_page_ids)
         allocated_pages = [x for x in self.pages if x.id in allocated_page_ids]
         return allocated_pages
+
+    def free_pages(self, page_ids: List[int]) -> None:
+        for id in page_ids:
+            index = self.occupied_list.index(id)
+            self.free_list.append(self.occupied_list.pop(index))
 
 
 @dataclass(slots=True)
@@ -241,6 +249,9 @@ class Process:
     size: int
     instructions: List[int]
 
+    def __eq__(self, __value: object) -> bool:
+        return self.id == __value
+
 
 @dataclass
 class OperatingSystem:
@@ -259,6 +270,13 @@ class OperatingSystem:
     def start_process(self, program: Process):
         process = self.init_process(program=program)
         self.process_table.append(process)
+    
+    def close_process(self, pid: int):
+        process_index = self.process_table.index(pid)
+        process = self.process_table.pop(process_index)
+        process_page_ids = list(set([to_virtual_address(x).page for x in process.instructions]))
+        self.virtual_memory.free_pages(process_page_ids)
+
 
     def init_process(self, program: Program):
         """Map to virtual memory, create Process object"""

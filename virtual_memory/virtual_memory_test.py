@@ -93,6 +93,28 @@ class OperatingSystemTestCase(unittest.TestCase):
             process2.instructions,
             [x + process1.size for x in program2.instructions]
         )
+
+    def test_teardown_first_process(self):
+        program = vm.Program(
+            memory_size=32,
+            instructions=list(range(32))
+        )
+        self.os.start_process(program=program)
+        self.os.close_process(pid=0)
+
+        self.assertEqual(
+            len(self.os.process_table),
+            0
+        )
+        self.assertEqual(
+            self.os.virtual_memory.occupied_list,
+            []
+        )
+        self.assertEqual(
+            self.os.virtual_memory.free_list,
+            list(range(8, vm.VIRTUAL_MEMORY_PAGES)) + list(range(0, 8))
+        )
+        
         
     
 
