@@ -128,6 +128,9 @@ Some design notes:
 - Adding pages to the page table should probably happen when the virtual address range is allocated
 - The virtual address range is a straightforward mapping; the virtual addresses are still sequential
 
+## Fetching process instructions, loading into physical memory
+To run a process we need to fetch its next instruction and try to get its address from physical memory. If the address is not in physical memory, that is, if the page is not loaded into physical memory, bring that whole page into memory.
+
 
 
 

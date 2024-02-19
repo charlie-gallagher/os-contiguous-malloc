@@ -9,6 +9,10 @@ class VirtualMemoryExceededError(Exception):
     pass
 
 
+class PageFaultError(Exception):
+    pass
+
+
 PAGE_SIZE = 4
 VIRTUAL_MEMORY_PAGES = 256
 
@@ -180,9 +184,13 @@ class Page:
     size: int
     accessed: bool = False
     modified: bool = False
+    physical_address: Union[None, int] = None
 
     def __eq__(self, __value: object) -> bool:
-        return self.id == __value.id
+        if isinstance(__value, Page):
+            return self.id == __value.id
+        else:
+            return self.id == __value
 
 
 @dataclass
@@ -258,8 +266,9 @@ class OperatingSystem:
     virtual_memory: VirtualMemory
     physical_memory: Memory
     page_size: int
+    n_virtual_memory_pages: int
+    page_table: List[Page] = field(init=False)
     process_table: List[Process] = field(init=False, default_factory=list)
-    page_table: List[Page] = field(init=False, default_factory=list)
     next_process_id: int = field(init=False, default=0)
 
     def _get_new_process_id(self):
@@ -271,13 +280,14 @@ class OperatingSystem:
         process = self.init_process(program=program)
         self.process_table.append(process)
         return process.id
-    
+
     def close_process(self, pid: int):
         process_index = self.process_table.index(pid)
         process = self.process_table.pop(process_index)
-        process_page_ids = list(set([to_virtual_address(x).page for x in process.instructions]))
+        process_page_ids = list(
+            set([to_virtual_address(x).page for x in process.instructions])
+        )
         self.virtual_memory.free_pages(process_page_ids)
-
 
     def init_process(self, program: Program):
         """Map to virtual memory, create Process object"""
@@ -302,6 +312,23 @@ class OperatingSystem:
             x=first_page_address, page_size=self.page_size
         )
         return starting_address
+
+    def translate_address(self, addr: int) -> MemorySlice:
+        virtual_address = self.get_virtual_address(addr=addr)
+        page_index = self.virtual_memory.pages.index(virtual_address.page)
+        page_physical_address = self.virtual_memory.pages[page_index].physical_address
+        if page_physical_address is None:
+            raise PageFaultError
+
+    def get_virtual_address(self, addr: int):
+        # Get bits in virtual addresses
+        virtual_address_bits = (
+            self.n_virtual_memory_pages << int(log2(self.page_size))
+        ).bit_length()
+        # Calculate virtual address
+        return to_virtual_address(
+            x=addr, bits=virtual_address_bits, page_size=self.page_size
+        )
 
 
 # RUNTIME FUNCTIONALITY ----------
