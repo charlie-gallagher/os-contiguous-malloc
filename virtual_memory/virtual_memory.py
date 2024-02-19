@@ -1,6 +1,7 @@
 from typing import Tuple, Any, Union, List, Optional
 from dataclasses import dataclass, InitVar, field
 from collections import deque
+from math import log2
 
 
 # LIBRARY CODE --------------
@@ -194,6 +195,8 @@ class VirtualMemory:
     def reserve_pages(self, n: int) -> List[Page]:
         # TODO: Only allocate contiguous pages
         allocated_page_ids = self.free_list[:n]
+        del self.free_list[:n]
+        self.occupied_list.extend(allocated_page_ids)
         allocated_pages = [x for x in self.pages if x.id in allocated_page_ids]
         return allocated_pages
 
@@ -205,20 +208,22 @@ class VirtualAddress:
 
 
 def to_virtual_address(x: int, bits=32, page_size=4):
+    """page_size: number of elements"""
     max_address = (2**bits) - 1
     if x > max_address:
         raise VirtualMemoryExceededError(
             f"Address {x} exceeds virtual memory bounds ({bits} bits, max address {max_address})"
         )
 
-    offset_mask = (2**page_size) - 1
+    page_shift = int(log2(page_size))
+    offset_mask = (2**page_shift) - 1
     page_mask = (max_address) ^ offset_mask
-    page_shift = page_size
     va = VirtualAddress(page=(x & page_mask) >> page_shift, offset=x & offset_mask)
     return va
 
+
 def to_process_address(x: VirtualAddress, page_size=4):
-    page_shift = page_size
+    page_shift = int(log2(page_size))
     proc_addr = (x.page << page_shift) + x.offset
     return proc_addr
 
@@ -258,35 +263,26 @@ class OperatingSystem:
     def init_process(self, program: Program):
         """Map to virtual memory, create Process object"""
         initial_virtual_address = self.reserve_virtual_memory(size=program.memory_size)
-        process_instructions = [x + initial_virtual_address for x in program.instructions]
-        # TODO: process ids
+        process_instructions = [
+            x + initial_virtual_address for x in program.instructions
+        ]
         process_id = self._get_new_process_id()
         process = Process(
-            id=process_id,
-            size=program.memory_size,
-            instructions=process_instructions
+            id=process_id, size=program.memory_size, instructions=process_instructions
         )
         return process
-    
+
     def reserve_virtual_memory(self, size: int):
         """Gets a block of virtual memory of size ``size`` and returns starting address"""
-        required_pages = (size // self.page_size) + 1
+        required_pages = size // self.page_size
+        if size % self.page_size != 0:
+            required_pages += 1
         reserved_pages = self.virtual_memory.reserve_pages(n=required_pages)
         first_page_address = VirtualAddress(page=reserved_pages[0].id, offset=0)
-        starting_address = to_process_address(x=first_page_address, page_size=self.page_size)
+        starting_address = to_process_address(
+            x=first_page_address, page_size=self.page_size
+        )
         return starting_address
-
-
-    def reserve_process_pages(self, size):
-        required_pages = (size // self.page_size) + 1
-        free_pages = self.virtual_memory.free_list
-        try:
-            pages_to_reserve = free_pages[:required_pages]
-        except IndexError:
-            raise VirtualMemoryExceededError("Insufficient virtual memory")
-        del free_pages[:2]
-        self.virtual_memory.occupied_list.extend(pages_to_reserve)
-        return pages_to_reserve
 
 
 # RUNTIME FUNCTIONALITY ----------

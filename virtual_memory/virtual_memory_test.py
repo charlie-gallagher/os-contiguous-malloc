@@ -5,7 +5,7 @@ import virtual_memory.virtual_memory as vm
 class VirtualMemoryAddressTestCase(unittest.TestCase):
     def test_virtual_address_translation_works_as_expected(self):
         bits = 8
-        page_size = 4
+        page_size = 2**4 # 4 bits
         # 0001 1011, page = 1, offset = 11
         addr1 = 0x1B
         # 1111 0011, page = 15, offset = 3
@@ -59,6 +59,42 @@ class OperatingSystemTestCase(unittest.TestCase):
             program.instructions,
             process.instructions
         )
+
+    def test_initialize_two_processes(self):
+        program1 = vm.Program(
+            memory_size=32,
+            instructions=list(range(32))
+        )
+        program2 = vm.Program(
+            memory_size=32,
+            instructions=list(range(32))
+        )
+        self.os.start_process(program=program1)
+        self.os.start_process(program=program2)
+
+        self.assertEqual(len(self.os.process_table), 2)
+
+        process1 = self.os.process_table[0]
+        process2 = self.os.process_table[1]
+
+        self.assertEqual(
+            process1.id,
+            0
+        )
+        self.assertEqual(
+            process2.id,
+            1
+        )
+        self.assertEqual(
+            program1.instructions,
+            process1.instructions
+        )
+        self.assertEqual(
+            process2.instructions,
+            [x + process1.size for x in program2.instructions]
+        )
+        
+    
 
 
 
