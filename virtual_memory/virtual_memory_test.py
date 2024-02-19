@@ -40,7 +40,7 @@ class OperatingSystemTestCase(unittest.TestCase):
             ),
             physical_memory=vm.Memory(size=50),
             page_size=vm.PAGE_SIZE,
-            n_virtual_memory_pages=vm.VIRTUAL_MEMORY_PAGES
+            n_virtual_memory_pages=vm.VIRTUAL_MEMORY_PAGES,
         )
 
     def test_initialize_first_process(self):
