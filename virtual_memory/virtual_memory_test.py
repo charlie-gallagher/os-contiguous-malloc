@@ -110,8 +110,18 @@ class OperatingSystemTestCase(unittest.TestCase):
         program = vm.Program(memory_size=32, instructions=list(range(32)))
         pid = self.os.start_process(program=program)
         process = self.os.process_table[self.os.process_table.index(pid)]
-        first_instruction_address = process.instructions[0]
-        first_virtual_address = self.os.get_virtual_address(first_instruction_address)
+        first_virtual_address = self.os.get_virtual_address(process.instructions[0])
         self.os.load_page(first_virtual_address.page)
         # Test: address translation does not throw PageFaultError
-        self.os.translate_address(first_instruction_address)
+        first_physical_address = self.os.translate_address(process.instructions[0])
+        second_physical_address = self.os.translate_address(process.instructions[1])
+        self.assertEqual(
+            first_physical_address + 1,
+            second_physical_address
+        )
+        with self.assertRaises(vm.PageFaultError):
+            # Next page not loaded yet
+            self.os.translate_address(process.instructions[4])
+
+    
+
