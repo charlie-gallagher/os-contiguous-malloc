@@ -19,6 +19,9 @@ class MemoryExceededError(Exception):
 class PageAllocationError(Exception):
     pass
 
+class PageDeallocationError(Exception):
+    pass
+
 
 PAGE_SIZE = 4
 VIRTUAL_MEMORY_PAGES = 256
@@ -369,6 +372,18 @@ class OperatingSystem:
         else:
             raise MemoryExceededError
         return starting_address
+
+    def unlink_page(self, page_id: int):
+        page = self.virtual_memory.pages[self.virtual_memory.pages.index(page_id)]
+        if page.physical_address is None:
+            raise PageDeallocationError("Page has no physical address")
+        self._deallocate_page(addr=page.physical_address)
+        page.physical_address = None
+    
+    def _deallocate_page(self, addr: int):
+        slot_to_free = MemorySlice(memory_slice=(addr, addr + self.page_size - 1))
+        self.physical_memory.free(memory_slice=slot_to_free)
+
 
 
 # RUNTIME FUNCTIONALITY ----------

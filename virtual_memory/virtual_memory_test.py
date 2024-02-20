@@ -142,3 +142,15 @@ class OperatingSystemTestCase(unittest.TestCase):
         second_physical_address = self.os.translate_address(process.instructions[1])
         self.assertEqual(first_physical_address + 1, second_physical_address)
         fifth_physical_address = self.os.translate_address(process.instructions[4])
+
+    def test_page_can_be_deallocated(self):
+        program = vm.Program(memory_size=32, instructions=list(range(32)))
+        pid = self.os.start_process(program=program)
+        process = self.os.process_table[self.os.process_table.index(pid)]
+        first_virtual_address = self.os.get_virtual_address(process.instructions[0])
+        self.os.load_page(first_virtual_address.page)
+
+        # Test
+        self.os.unlink_page(first_virtual_address.page)
+        with self.assertRaises(vm.PageFaultError):
+            self.os.translate_address(process.instructions[0])
