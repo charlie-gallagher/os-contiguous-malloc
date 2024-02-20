@@ -115,10 +115,7 @@ class OperatingSystemTestCase(unittest.TestCase):
         # Test: address translation does not throw PageFaultError
         first_physical_address = self.os.translate_address(process.instructions[0])
         second_physical_address = self.os.translate_address(process.instructions[1])
-        self.assertEqual(
-            first_physical_address + 1,
-            second_physical_address
-        )
+        self.assertEqual(first_physical_address + 1, second_physical_address)
         with self.assertRaises(vm.PageFaultError):
             # Next page not loaded yet
             self.os.translate_address(process.instructions[4])
@@ -132,23 +129,16 @@ class OperatingSystemTestCase(unittest.TestCase):
         with self.assertRaises(vm.PageAllocationError):
             self.os.load_page(first_virtual_address.page)
 
-
     def test_two_pages_can_be_loaded_into_physical_memory(self):
         program = vm.Program(memory_size=32, instructions=list(range(32)))
         pid = self.os.start_process(program=program)
         process = self.os.process_table[self.os.process_table.index(pid)]
         first_virtual_address = self.os.get_virtual_address(process.instructions[0])
-        fifth_virtual_address = self.os.get_virtual_address(process.instructions[4]) 
+        fifth_virtual_address = self.os.get_virtual_address(process.instructions[4])
         self.os.load_page(first_virtual_address.page)
         self.os.load_page(fifth_virtual_address.page)
         # Test: address translation does not throw PageFaultError
         first_physical_address = self.os.translate_address(process.instructions[0])
         second_physical_address = self.os.translate_address(process.instructions[1])
-        self.assertEqual(
-            first_physical_address + 1,
-            second_physical_address
-        )
+        self.assertEqual(first_physical_address + 1, second_physical_address)
         fifth_physical_address = self.os.translate_address(process.instructions[4])
-
-    
-
