@@ -16,6 +16,9 @@ class PageFaultError(Exception):
 class MemoryExceededError(Exception):
     pass
 
+class PageAllocationError(Exception):
+    pass
+
 
 PAGE_SIZE = 4
 VIRTUAL_MEMORY_PAGES = 256
@@ -348,6 +351,8 @@ class OperatingSystem:
         in the physical memory structure.
         """
         page = self.virtual_memory.pages[self.virtual_memory.pages.index(page_id)]
+        if page.physical_address is not None:
+            raise PageAllocationError("Page already has physical address")
         page.physical_address = self._allocate_for_page()
 
     def _allocate_for_page(self) -> int:
