@@ -13,6 +13,10 @@ class PageFaultError(Exception):
     pass
 
 
+class MemoryExceededError(Exception):
+    pass
+
+
 PAGE_SIZE = 4
 VIRTUAL_MEMORY_PAGES = 256
 
@@ -267,7 +271,6 @@ class OperatingSystem:
     physical_memory: Memory
     page_size: int
     n_virtual_memory_pages: int
-    page_table: List[Page] = field(init=False)
     process_table: List[Process] = field(init=False, default_factory=list)
     next_process_id: int = field(init=False, default=0)
 
@@ -313,14 +316,22 @@ class OperatingSystem:
         )
         return starting_address
 
-    def translate_address(self, addr: int) -> MemorySlice:
+    def translate_address(self, addr: int) -> int:
+        """Translate virtual address into a physical address
+
+        If the page is not loaded into physical memory, throws a ``PageFaultError``.
+        """
         virtual_address = self.get_virtual_address(addr=addr)
         page_index = self.virtual_memory.pages.index(virtual_address.page)
         page_physical_address = self.virtual_memory.pages[page_index].physical_address
         if page_physical_address is None:
             raise PageFaultError
+        physical_address = page_physical_address + virtual_address.offset
+        assert self.physical_memory.memory_map[physical_address] == 1
+        return physical_address
 
     def get_virtual_address(self, addr: int):
+        """Translate virtual address into OS-specific ``VirtualAddress``"""
         # Get bits in virtual addresses
         virtual_address_bits = (
             self.n_virtual_memory_pages << int(log2(self.page_size))
@@ -329,6 +340,30 @@ class OperatingSystem:
         return to_virtual_address(
             x=addr, bits=virtual_address_bits, page_size=self.page_size
         )
+
+    def load_page(self, page_id: int):
+        """Load page into memory
+
+        Assigns page id a physical address range, marks that memory as reserved
+        in the physical memory structure.
+        """
+        page = self.virtual_memory.pages[self.virtual_memory.pages.index(page_id)]
+        page.physical_address = self._allocate_for_page()
+
+    def _allocate_for_page(self) -> int:
+        """Allocate memory for the page and return the starting address"""
+        slot_to_reserve = None  # type: MemorySlice
+        for slot in self.physical_memory.available_slots():
+            if slot.length < self.page_size:
+                continue
+            slot_to_reserve = slot.sub_slice(length=self.page_size)
+            break
+        if slot_to_reserve is not None:
+            starting_address = slot_to_reserve.start
+            self.physical_memory.reserve(slot_to_reserve)
+        else:
+            raise MemoryExceededError
+        return starting_address
 
 
 # RUNTIME FUNCTIONALITY ----------

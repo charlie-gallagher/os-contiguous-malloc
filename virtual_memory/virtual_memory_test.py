@@ -105,3 +105,13 @@ class OperatingSystemTestCase(unittest.TestCase):
 
         with self.assertRaises(vm.PageFaultError):
             self.os.translate_address(first_instruction_address)
+
+    def test_pages_can_be_loaded_into_physical_memory(self):
+        program = vm.Program(memory_size=32, instructions=list(range(32)))
+        pid = self.os.start_process(program=program)
+        process = self.os.process_table[self.os.process_table.index(pid)]
+        first_instruction_address = process.instructions[0]
+        first_virtual_address = self.os.get_virtual_address(first_instruction_address)
+        self.os.load_page(first_virtual_address.page)
+        # Test: address translation does not throw PageFaultError
+        self.os.translate_address(first_instruction_address)
