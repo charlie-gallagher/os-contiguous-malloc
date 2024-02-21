@@ -267,7 +267,7 @@ class Process:
     # Should each process translate its address space into pages?
     id: int
     size: int
-    instructions: List[int]
+    instructions: deque[int]
 
     def __eq__(self, __value: object) -> bool:
         return self.id == __value
@@ -297,7 +297,7 @@ class OperatingSystem:
         page = self.virtual_memory.pages[page_index]
         return page
 
-    def start_process(self, program: Process):
+    def start_process(self, program: Program):
         process = self.init_process(program=program)
         self.process_table.append(process)
         return process.id
@@ -317,7 +317,7 @@ class OperatingSystem:
         ]
         process_id = self._get_new_process_id()
         process = Process(
-            id=process_id, size=program.memory_size, instructions=process_instructions
+            id=process_id, size=program.memory_size, instructions=deque(process_instructions)
         )
         return process
 
@@ -400,7 +400,8 @@ class OperatingSystem:
         pass
 
     def tick_process(self, pid: int):
-        pass
+        process = self.get_process(pid=pid)
+        next_instruction = process.instructions.pop_left()
 
 
 # RUNTIME FUNCTIONALITY ----------

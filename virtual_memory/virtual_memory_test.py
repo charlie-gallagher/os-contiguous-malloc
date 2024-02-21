@@ -50,7 +50,7 @@ class OperatingSystemTestCase(unittest.TestCase):
 
         process = self.os.process_table[0]
         self.assertEqual(process.id, 0)
-        self.assertEqual(program.instructions, process.instructions)
+        self.assertEqual(program.instructions, list(process.instructions))
 
     def test_initialize_two_processes(self):
         program1 = vm.Program(memory_size=32, instructions=list(range(32)))
@@ -65,9 +65,9 @@ class OperatingSystemTestCase(unittest.TestCase):
 
         self.assertEqual(process1.id, 0)
         self.assertEqual(process2.id, 1)
-        self.assertEqual(program1.instructions, process1.instructions)
+        self.assertEqual(program1.instructions, list(process1.instructions))
         self.assertEqual(
-            process2.instructions, [x + process1.size for x in program2.instructions]
+            list(process2.instructions), [x + process1.size for x in program2.instructions]
         )
 
     def test_teardown_first_process(self):
