@@ -1,4 +1,4 @@
-from typing import Tuple, Any, Union, List, Optional
+from typing import Tuple, Any, Union, List, Optional, Generator
 from dataclasses import dataclass, InitVar, field
 from collections import deque
 from math import log2
@@ -27,6 +27,7 @@ class PageDeallocationError(Exception):
 
 PAGE_SIZE = 4
 VIRTUAL_MEMORY_PAGES = 256
+TOTAL_PAGE_FAULTS = 0
 
 
 @dataclass(slots=True)
@@ -131,7 +132,7 @@ class Memory:
     def free(self, memory_slice: MemorySlice) -> None:
         self._update_slice_with(memory_slice=memory_slice, value=False)
 
-    def available_slots(self) -> Any:
+    def available_slots(self) -> Generator[MemorySlice, None, None]:
         """
         Get next available slice and its size
 
@@ -228,6 +229,14 @@ class VirtualMemory:
             index = self.occupied_list.index(id)
             self.free_list.append(self.occupied_list.pop(index))
 
+    def physical_pages(self) -> Generator[Page, None, None]:
+        for p in self.pages:
+            if p.physical_address is None:
+                continue
+            else:
+                yield p
+        return None
+
 
 @dataclass(slots=True)
 class VirtualAddress:
@@ -317,7 +326,9 @@ class OperatingSystem:
         ]
         process_id = self._get_new_process_id()
         process = Process(
-            id=process_id, size=program.memory_size, instructions=deque(process_instructions)
+            id=process_id,
+            size=program.memory_size,
+            instructions=deque(process_instructions),
         )
         return process
 
@@ -368,7 +379,12 @@ class OperatingSystem:
         page = self.get_page(page_id=page_id)
         if page.physical_address is not None:
             raise PageAllocationError("Page already has physical address")
-        page.physical_address = self._allocate_for_page()
+        try:
+            page.physical_address = self._allocate_for_page()
+        except MemoryExceededError:
+            self.free_page(strategy="random")
+            page.physical_address = self._allocate_for_page()
+        return None
 
     def _allocate_for_page(self) -> int:
         """Allocate memory for the page and return the starting address"""
@@ -396,28 +412,66 @@ class OperatingSystem:
         slot_to_free = MemorySlice(memory_slice=(addr, addr + self.page_size - 1))
         self.physical_memory.free(memory_slice=slot_to_free)
 
-    def tick_processes(self):
-        pass
+    def free_page(self, strategy="random"):
+        """
+        Strategy is one of random, ...
+        """
+        if strategy == "random":
+            self._free_random_page()
+        else:
+            raise NotImplementedError
 
-    def tick_process(self, pid: int):
-        process = self.get_process(pid=pid)
-        next_instruction = process.instructions.pop_left()
+    def _free_random_page(self):
+        first_page_in_memory = None
+        for page in self.virtual_memory.physical_pages():
+            first_page_in_memory = page
+            break
+        self.unlink_page(page_id=first_page_in_memory)
+
+    def tick_processes(self):
+        for process in self.process_table:
+            print(f"Ticking process `{process.id}`")
+            self.tick_process(process=process)
+
+    def tick_process(self, process: Process):
+        next_instruction = process.instructions.popleft()
+        try:
+            self.translate_address(next_instruction)
+        except PageFaultError:
+            print("Page fault!")
+            next_instruction_va = self.get_virtual_address(next_instruction)
+            self.load_page(page_id=next_instruction_va.page)
+            # Confirm working by getting physical address
+            self.translate_address(next_instruction)
 
 
 # RUNTIME FUNCTIONALITY ----------
 def main():
-    pass
-
-
-def _generate_virtual_memory(pages, page_size):
-    return VirtualMemory([Page(id=x, size=page_size) for x in range(pages)])
-
-
-if __name__ == "__main__":
     os = OperatingSystem(
         virtual_memory=_generate_virtual_memory(
             pages=VIRTUAL_MEMORY_PAGES, page_size=PAGE_SIZE
         ),
         physical_memory=Memory(size=50),
         page_size=PAGE_SIZE,
+        n_virtual_memory_pages=VIRTUAL_MEMORY_PAGES,
     )
+    programs = _generate_programs(15)
+    for p in programs:
+        os.start_process(program=p)
+    os.tick_processes()
+    os.tick_processes()
+    os.tick_processes()
+    os.tick_processes()
+    os.tick_processes()
+
+
+def _generate_virtual_memory(pages, page_size):
+    return VirtualMemory([Page(id=x, size=page_size) for x in range(pages)])
+
+
+def _generate_programs(n: int) -> List[Program]:
+    return [Program(memory_size=32, instructions=list(range(32))) for i in range(n)]
+
+
+if __name__ == "__main__":
+    main()
