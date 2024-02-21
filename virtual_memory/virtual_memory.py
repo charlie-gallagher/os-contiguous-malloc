@@ -226,8 +226,17 @@ class VirtualMemory:
 
     def free_pages(self, page_ids: List[int]) -> None:
         for id in page_ids:
-            index = self.occupied_list.index(id)
-            self.free_list.append(self.occupied_list.pop(index))
+            occupied_list_index = self.occupied_list.index(id)
+            page_list_index = self.pages.index(id)
+            page = self.pages[page_list_index]
+            self._reset_page(page=page)
+            self.free_list.append(self.occupied_list.pop(occupied_list_index))
+    
+    def _reset_page(self, page: Page):
+        page.accessed = False
+        page.modified = False
+        if page.physical_address is not None:
+            raise PageDeallocationError("Page still has a physical address")
 
     def physical_pages(self) -> Generator[Page, None, None]:
         for p in self.pages:
@@ -319,6 +328,11 @@ class OperatingSystem:
         process_page_ids = list(
             set([to_virtual_address(x).page for x in process.instructions])
         )
+        # Release all physical pages
+        for page in self.virtual_memory.physical_pages():
+            if page.id in process_page_ids:
+                self.unlink_page(page_id=page.id)
+        # Release physical memory address range
         self.virtual_memory.free_pages(process_page_ids)
         self.process_table.remove(process)
 
