@@ -16,8 +16,10 @@ class PageFaultError(Exception):
 class MemoryExceededError(Exception):
     pass
 
+
 class PageAllocationError(Exception):
     pass
+
 
 class PageDeallocationError(Exception):
     pass
@@ -284,12 +286,6 @@ class OperatingSystem:
         out = self.next_process_id
         self.next_process_id += 1
         return out
-    
-    def tick_processes(self):
-        pass
-
-    def tick_process(self, pid: int):
-        pass
 
     def get_process(self, pid: int):
         process_index = self.process_table.index(pid)
@@ -343,7 +339,9 @@ class OperatingSystem:
         If the page is not loaded into physical memory, throws a ``PageFaultError``.
         """
         virtual_address = self.get_virtual_address(addr=addr)
-        page_physical_address = self.get_page(page_id=virtual_address.page).physical_address
+        page_physical_address = self.get_page(
+            page_id=virtual_address.page
+        ).physical_address
         if page_physical_address is None:
             raise PageFaultError
         physical_address = page_physical_address + virtual_address.offset
@@ -393,11 +391,16 @@ class OperatingSystem:
             raise PageDeallocationError("Page has no physical address")
         self._deallocate_page(addr=page.physical_address)
         page.physical_address = None
-    
+
     def _deallocate_page(self, addr: int):
         slot_to_free = MemorySlice(memory_slice=(addr, addr + self.page_size - 1))
         self.physical_memory.free(memory_slice=slot_to_free)
 
+    def tick_processes(self):
+        pass
+
+    def tick_process(self, pid: int):
+        pass
 
 
 # RUNTIME FUNCTIONALITY ----------
