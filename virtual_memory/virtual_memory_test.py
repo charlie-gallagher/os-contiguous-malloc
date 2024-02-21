@@ -154,3 +154,23 @@ class OperatingSystemTestCase(unittest.TestCase):
         self.os.unlink_page(first_virtual_address.page)
         with self.assertRaises(vm.PageFaultError):
             self.os.translate_address(process.instructions[0])
+    
+    def test_deallocation_of_two_pages(self):
+        program = vm.Program(memory_size=32, instructions=list(range(32)))
+        pid = self.os.start_process(program=program)
+        process = self.os.process_table[self.os.process_table.index(pid)]
+        first_virtual_address = self.os.get_virtual_address(process.instructions[0])
+        fifth_virtual_address = self.os.get_virtual_address(process.instructions[4])
+        self.os.load_page(first_virtual_address.page)
+        self.os.translate_address(process.instructions[0])
+        self.os.unlink_page(first_virtual_address.page)
+
+        self.os.load_page(fifth_virtual_address.page)
+        self.os.translate_address(process.instructions[5])
+        self.os.unlink_page(fifth_virtual_address.page)
+
+        with self.assertRaises(vm.PageFaultError):
+            self.os.translate_address(process.instructions[0])
+        with self.assertRaises(vm.PageFaultError):
+            self.os.translate_address(process.instructions[5])
+
