@@ -1,5 +1,6 @@
 from typing import Tuple, Any, Union, List, Optional, Generator
 from copy import deepcopy
+import random
 from dataclasses import dataclass, InitVar, field
 from collections import deque
 from math import log2
@@ -442,11 +443,11 @@ class OperatingSystem:
             raise NotImplementedError
 
     def _free_random_page(self):
-        first_page_in_memory = None
-        for page in self.virtual_memory.physical_pages():
-            first_page_in_memory = page
-            break
-        self.unlink_page(page_id=first_page_in_memory)
+        physical_pages = list(self.virtual_memory.physical_pages())
+        random_physical_page_addr = random.randrange(0, len(physical_pages))
+        random_physical_page = physical_pages[random_physical_page_addr]
+        print(f"Removing page `{random_physical_page.id}`")
+        self.unlink_page(page_id=random_physical_page)
 
     def tick_processes(self):
         process_ids = [x.id for x in self.process_table]
