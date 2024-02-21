@@ -275,7 +275,8 @@ class Program:
 class Process:
     id: int
     size: int
-    instructions: deque[int]
+    instructions: List[int]
+    next_instructions: deque[int]
 
     def __eq__(self, __value: object) -> bool:
         if isinstance(__value, Process):
@@ -331,7 +332,8 @@ class OperatingSystem:
         process = Process(
             id=process_id,
             size=program.memory_size,
-            instructions=deque(process_instructions),
+            instructions=process_instructions,
+            next_instructions=deque(process_instructions),
         )
         return process
 
@@ -437,10 +439,10 @@ class OperatingSystem:
             self.tick_process(process=process)
 
     def tick_process(self, process: Process):
-        if len(process.instructions) == 0:
+        if len(process.next_instructions) == 0:
             self.close_process(pid=process.id)
             return
-        next_instruction = process.instructions.popleft()
+        next_instruction = process.next_instructions.popleft()
         try:
             self.translate_address(next_instruction)
         except PageFaultError:
@@ -464,19 +466,15 @@ def main():
     programs = _generate_programs(15)
     for p in programs:
         os.start_process(program=p)
-    
     run(os)
-    
+
 
 def run(os: OperatingSystem):
     tick_counter = 0
     while len(os.process_table) > 0:
-        if tick_counter == 32:
-            breakpoint()
         print(f"TICK: {tick_counter}")
         os.tick_processes()
         tick_counter += 1
-
 
 
 def _generate_virtual_memory(pages, page_size):
