@@ -534,11 +534,25 @@ def _generate_virtual_memory(pages, page_size):
 
 
 def _generate_programs(n: int) -> List[Program]:
+    """
+    Generate random but natural programs
+
+    A program is defined as a list of integers, each of which represents some
+    instruction. To generate a program the following is followed:
+
+    - Choose a number of instructions between 16 and 64, by 4s
+    - Sample working sets to create at least 64 random but natural instructions
+    """
     programs = list()
     for i in range(n):
-        n_instructions = random.randrange(32)
-        instructions = list(range(n_instructions))
-        random.shuffle(instructions)
+        n_instructions = random.randrange(16, 65, 4)
+        working_sets = [[1, 2, 3], [4, 5, 6], [7, 8, 9, 10]]
+        working_set_collection = random.sample(working_sets, k=30, counts=[10, 10, 10])
+        # Flatten list
+        instructions = list()
+        for ws in working_set_collection:
+            instructions.extend(ws)
+        del instructions[n_instructions:]
         p = Program(memory_size=32, instructions=instructions)
         programs.append(p)
     return programs
