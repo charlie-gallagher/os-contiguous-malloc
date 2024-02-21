@@ -1,4 +1,5 @@
 from typing import Tuple, Any, Union, List, Optional, Generator
+from copy import deepcopy
 from dataclasses import dataclass, InitVar, field
 from collections import deque
 from math import log2
@@ -231,7 +232,7 @@ class VirtualMemory:
             page = self.pages[page_list_index]
             self._reset_page(page=page)
             self.free_list.append(self.occupied_list.pop(occupied_list_index))
-    
+
     def _reset_page(self, page: Page):
         page.accessed = False
         page.modified = False
@@ -448,11 +449,20 @@ class OperatingSystem:
         self.unlink_page(page_id=first_page_in_memory)
 
     def tick_processes(self):
-        for process in self.process_table:
-            print(f"Ticking process `{process.id}`")
-            self.tick_process(process=process)
+        process_ids = [x.id for x in self.process_table]
+        for id in process_ids:
+            print(f"Ticking process `{id}`")
+            self.tick_process(pid=id)
 
-    def tick_process(self, process: Process):
+    def tick_process(self, pid: int):
+        """
+        Fetch next instruction
+
+        This must be a process id, because the process might get deleted from
+        the process list. This can throw off a loop that loops over the
+        processes and ticks them.
+        """
+        process = self.get_process(pid=pid)
         if len(process.next_instructions) == 0:
             self.close_process(pid=process.id)
             return
