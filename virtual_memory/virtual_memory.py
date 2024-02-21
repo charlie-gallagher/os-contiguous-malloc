@@ -284,6 +284,22 @@ class OperatingSystem:
         out = self.next_process_id
         self.next_process_id += 1
         return out
+    
+    def tick_processes(self):
+        pass
+
+    def tick_process(self, pid: int):
+        pass
+
+    def get_process(self, pid: int):
+        process_index = self.process_table.index(pid)
+        process = self.process_table.pop(process_index)
+        return process
+
+    def get_page(self, page_id) -> Page:
+        page_index = self.virtual_memory.pages.index(page_id)
+        page = self.virtual_memory.pages[page_index]
+        return page
 
     def start_process(self, program: Process):
         process = self.init_process(program=program)
@@ -291,8 +307,7 @@ class OperatingSystem:
         return process.id
 
     def close_process(self, pid: int):
-        process_index = self.process_table.index(pid)
-        process = self.process_table.pop(process_index)
+        process = self.get_process(pid)
         process_page_ids = list(
             set([to_virtual_address(x).page for x in process.instructions])
         )
@@ -328,8 +343,7 @@ class OperatingSystem:
         If the page is not loaded into physical memory, throws a ``PageFaultError``.
         """
         virtual_address = self.get_virtual_address(addr=addr)
-        page_index = self.virtual_memory.pages.index(virtual_address.page)
-        page_physical_address = self.virtual_memory.pages[page_index].physical_address
+        page_physical_address = self.get_page(page_id=virtual_address.page).physical_address
         if page_physical_address is None:
             raise PageFaultError
         physical_address = page_physical_address + virtual_address.offset
@@ -353,7 +367,7 @@ class OperatingSystem:
         Assigns page id a physical address range, marks that memory as reserved
         in the physical memory structure.
         """
-        page = self.virtual_memory.pages[self.virtual_memory.pages.index(page_id)]
+        page = self.get_page(page_id=page_id)
         if page.physical_address is not None:
             raise PageAllocationError("Page already has physical address")
         page.physical_address = self._allocate_for_page()
@@ -374,7 +388,7 @@ class OperatingSystem:
         return starting_address
 
     def unlink_page(self, page_id: int):
-        page = self.virtual_memory.pages[self.virtual_memory.pages.index(page_id)]
+        page = self.get_page(page_id=page_id)
         if page.physical_address is None:
             raise PageDeallocationError("Page has no physical address")
         self._deallocate_page(addr=page.physical_address)
