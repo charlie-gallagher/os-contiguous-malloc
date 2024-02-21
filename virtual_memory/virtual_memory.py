@@ -403,7 +403,7 @@ class OperatingSystem:
         try:
             page.physical_address = self._allocate_for_page()
         except MemoryExceededError:
-            self.free_page(strategy="random")
+            self.free_page(strategy="MRU")
             page.physical_address = self._allocate_for_page()
         return None
 
@@ -439,6 +439,10 @@ class OperatingSystem:
         """
         if strategy == "random":
             self._free_random_page()
+        elif strategy == "LRU":
+            self._free_lru_page()
+        elif strategy == "MRU":
+            self._free_mru_page()
         else:
             raise NotImplementedError
 
@@ -449,6 +453,18 @@ class OperatingSystem:
         print(f"Removing page `{random_physical_page.id}`")
         self.unlink_page(page_id=random_physical_page)
 
+    def _free_lru_page(self):
+        first_page_in_memory = None
+        for page in self.virtual_memory.physical_pages():
+            first_page_in_memory = page
+            break
+        self.unlink_page(page_id=first_page_in_memory)
+
+    def _free_mru_page(self):
+        pages = list(self.virtual_memory.physical_pages())
+        last_page_in_memory = pages[-1]
+        self.unlink_page(page_id=last_page_in_memory)
+
     def tick_processes(self):
         process_ids = [x.id for x in self.process_table]
         for id in process_ids:
@@ -457,7 +473,7 @@ class OperatingSystem:
 
     def tick_process(self, pid: int):
         """
-        Fetch next instruction
+        Fetch a random number of instructions
 
         This must be a process id, because the process might get deleted from
         the process list. This can throw off a loop that loops over the
@@ -465,13 +481,23 @@ class OperatingSystem:
         """
         process = self.get_process(pid=pid)
         if len(process.next_instructions) == 0:
-            self.close_process(pid=process.id)
+            self.close_process(pid=pid)
             return
+        n_remaining_instructions = len(process.next_instructions)
+        between_one_and_four = random.randrange(1, 5)
+        n_instructions_to_execute = between_one_and_four if between_one_and_four <= n_remaining_instructions else n_remaining_instructions
+        print(f"Executing `{n_instructions_to_execute}` instructions")
+        for i in range(n_instructions_to_execute):
+            self.execute_next_process_instruction(process=process)
+
+    def execute_next_process_instruction(self, process: Process):
+        global TOTAL_PAGE_FAULTS
         next_instruction = process.next_instructions.popleft()
         try:
             self.translate_address(next_instruction)
         except PageFaultError:
             print("Page fault!")
+            TOTAL_PAGE_FAULTS += 1
             next_instruction_va = self.get_virtual_address(next_instruction)
             self.load_page(page_id=next_instruction_va.page)
             # Confirm working by getting physical address
@@ -492,6 +518,7 @@ def main():
     for p in programs:
         os.start_process(program=p)
     run(os)
+    print(f"Total page faults: {TOTAL_PAGE_FAULTS}")
 
 
 def run(os: OperatingSystem):
@@ -507,8 +534,14 @@ def _generate_virtual_memory(pages, page_size):
 
 
 def _generate_programs(n: int) -> List[Program]:
-    return [Program(memory_size=32, instructions=list(range(32))) for i in range(n)]
-
+    programs = list()
+    for i in range(n):
+        n_instructions = random.randrange(32)
+        instructions = list(range(n_instructions))
+        random.shuffle(instructions)
+        p = Program(memory_size=32, instructions=instructions)
+        programs.append(p)
+    return programs
 
 if __name__ == "__main__":
     main()
