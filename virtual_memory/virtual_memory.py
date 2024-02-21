@@ -273,13 +273,15 @@ class Program:
 
 @dataclass
 class Process:
-    # Should each process translate its address space into pages?
     id: int
     size: int
     instructions: deque[int]
 
     def __eq__(self, __value: object) -> bool:
-        return self.id == __value
+        if isinstance(__value, Process):
+            return self.id == __value.id
+        else:
+            return self.id == __value
 
 
 @dataclass
@@ -298,7 +300,7 @@ class OperatingSystem:
 
     def get_process(self, pid: int):
         process_index = self.process_table.index(pid)
-        process = self.process_table.pop(process_index)
+        process = self.process_table[process_index]
         return process
 
     def get_page(self, page_id) -> Page:
@@ -317,6 +319,7 @@ class OperatingSystem:
             set([to_virtual_address(x).page for x in process.instructions])
         )
         self.virtual_memory.free_pages(process_page_ids)
+        self.process_table.remove(process)
 
     def init_process(self, program: Program):
         """Map to virtual memory, create Process object"""
@@ -434,6 +437,9 @@ class OperatingSystem:
             self.tick_process(process=process)
 
     def tick_process(self, process: Process):
+        if len(process.instructions) == 0:
+            self.close_process(pid=process.id)
+            return
         next_instruction = process.instructions.popleft()
         try:
             self.translate_address(next_instruction)
@@ -445,7 +451,7 @@ class OperatingSystem:
             self.translate_address(next_instruction)
 
 
-# RUNTIME FUNCTIONALITY ----------
+# RUNTIME ----------
 def main():
     os = OperatingSystem(
         virtual_memory=_generate_virtual_memory(
@@ -458,11 +464,19 @@ def main():
     programs = _generate_programs(15)
     for p in programs:
         os.start_process(program=p)
-    os.tick_processes()
-    os.tick_processes()
-    os.tick_processes()
-    os.tick_processes()
-    os.tick_processes()
+    
+    run(os)
+    
+
+def run(os: OperatingSystem):
+    tick_counter = 0
+    while len(os.process_table) > 0:
+        if tick_counter == 32:
+            breakpoint()
+        print(f"TICK: {tick_counter}")
+        os.tick_processes()
+        tick_counter += 1
+
 
 
 def _generate_virtual_memory(pages, page_size):
